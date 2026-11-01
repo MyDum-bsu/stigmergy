@@ -106,17 +106,14 @@ def start_agent(session: str, name: str, kind: str, pane: str) -> dict:
     return data.get("result") or {}
 
 
-def prompt(session: str, target: str, text: str, timeout_ms: int = 1_800_000) -> dict:
+def prompt(session: str, target: str, text: str, timeout_ms: int = 1_800_000, wait: bool = True) -> dict:
+    args = ["agent", "prompt", target, text]
+    if wait:
+        args += ["--wait", "--timeout", str(timeout_ms)]
     data = _json(
         session,
-        "agent",
-        "prompt",
-        target,
-        text,
-        "--wait",
-        "--timeout",
-        str(timeout_ms),
-        timeout=max(30, timeout_ms // 1000 + 30),
+        *args,
+        timeout=max(30, timeout_ms // 1000 + 30) if wait else 30,
     )
     return data.get("result") or {}
 
@@ -216,7 +213,7 @@ class HerdrRunner:
         self.agent = agent
         self.timeout_ms = timeout_ms
 
-    def start(self, task_id: str, prompt_text: str, workspace: Path) -> RunnerHandle:
+    def start(self, task_id: str, prompt_text: str, workspace: Path, wait: bool = True) -> RunnerHandle:
         ok, detail = guard(self.session)
         if not ok:
             raise HerdrError(f"herdr guard failed: {detail}")
@@ -224,7 +221,7 @@ class HerdrRunner:
         pane = str((created.get("root_pane") or {}).get("pane_id", ""))
         name = f"stg-{task_id}".lower().replace("_", "-")[:32]
         start_agent(self.session, name, self.agent, pane)
-        prompt(self.session, name, prompt_text, self.timeout_ms)
+        prompt(self.session, name, prompt_text, self.timeout_ms, wait=wait)
         handle = RunnerHandle(
             kind=self.kind,
             session=self.session,
@@ -232,10 +229,11 @@ class HerdrRunner:
             pane=pane,
             workspace=str((created.get("workspace") or {}).get("workspace_id", "")),
         )
-        marker = detect_error(self.read(handle))
-        if marker:
-            self.stop(handle)
-            raise HerdrError(f"runner reported {marker}")
+        if wait:
+            marker = detect_error(self.read(handle))
+            if marker:
+                self.stop(handle)
+                raise HerdrError(f"runner reported {marker}")
         return handle
 
     def status(self, handle: RunnerHandle) -> str:

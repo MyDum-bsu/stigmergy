@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from stigmergy.runner import herdr_app
 
@@ -51,6 +52,19 @@ def test_wait_ignores_early_idle(monkeypatch) -> None:
     monkeypatch.setattr(herdr_app, "read", lambda terminal, lines=120: "answer")
     monkeypatch.setattr(herdr_app.time, "sleep", lambda seconds: None)
     assert herdr_app.wait_until_settled("t1", 10) == "answer"
+
+
+def test_detached_start_does_not_wait(monkeypatch) -> None:
+    monkeypatch.setattr(
+        herdr_app,
+        "create_space",
+        lambda app, name, folder, agent, task: {"space": "sp1", "terminal": "t1"},
+    )
+    called = []
+    monkeypatch.setattr(herdr_app, "wait_until_settled", lambda *a, **k: called.append(1))
+    handle = herdr_app.HerdrAppRunner().start("T1", "prompt", Path("/tmp"), wait=False)
+    assert handle.meta["space"] == "sp1"
+    assert called == []
 
 
 def test_cleanup_only_factory_spaces(monkeypatch) -> None:

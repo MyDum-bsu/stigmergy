@@ -220,16 +220,14 @@ class HerdrAppRunner:
         self.agent = agent
         self.timeout_s = timeout_s
 
-    def start(self, task_id: str, prompt: str, workspace: Path) -> RunnerHandle:
+    def start(self, task_id: str, prompt: str, workspace: Path, wait: bool = True) -> RunnerHandle:
         created = create_space(self.app, f"{PREFIX}{task_id}", workspace, self.agent, prompt)
         space = str(created.get("space", ""))
         terminal = str(created.get("terminal", ""))
         if not space or not terminal:
             raise HerdrAppError(f"space.new returned no ids: {created}")
-        try:
+        if wait:
             wait_until_settled(terminal, self.timeout_s)
-        except Exception:
-            raise
         return RunnerHandle(
             kind=self.kind,
             session=self.app,

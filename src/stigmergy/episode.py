@@ -108,6 +108,8 @@ def start_episode(
     task_id: str,
     agent: str = "stg",
     runner: str = "manual",
+    *,
+    wait_runner: bool = True,
 ) -> tuple[EpisodeResult, str]:
     state = state_of(board, config.name)
     task = state.task(task_id)
@@ -141,7 +143,7 @@ def start_episode(
             timeout_s=int(config.runner.get("prompt_timeout_s", 1800)),
         )
         try:
-            handle = app_runner.start(task.id, prompt, wt.path)
+            handle = app_runner.start(task.id, prompt, wt.path, wait=wait_runner)
         except Exception as exc:
             _append(
                 board,
@@ -161,7 +163,7 @@ def start_episode(
             agent=str(config.runner.get("agent", "pi")),
         )
         try:
-            handle = herdr_runner.start(task.id, prompt, wt.path)
+            handle = herdr_runner.start(task.id, prompt, wt.path, wait=wait_runner)
         except Exception as exc:
             _append(
                 board,

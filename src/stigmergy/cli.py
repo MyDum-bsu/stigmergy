@@ -307,8 +307,24 @@ def cmd_episode(args: argparse.Namespace) -> int:
 
 def cmd_run(args: argparse.Namespace) -> int:
     _root, config, board = _ctx(args)
+    if args.detach and args.auto:
+        raise BoardError("--detach and --auto are mutually exclusive; finish later with stg episode finish")
     _ensure_claimed(board, config, args.id, args.agent)
-    result, prompt_text = start_episode(config, board, args.id, args.agent, args.runner)
+    result, prompt_text = start_episode(
+        config,
+        board,
+        args.id,
+        args.agent,
+        args.runner,
+        wait_runner=not args.detach,
+    )
+    if args.detach:
+        _emit(args, result.as_dict(), json.dumps(result.as_dict(), ensure_ascii=False, indent=2))
+        print(
+            f"detached: space={result.runner_space or '-'} handle={result.runner_handle or '-'}\n"
+            f"finish: stg episode finish {args.id} --auto"
+        )
+        return 0
     if args.runner == "noop":
         result = finish_episode(
             config,
@@ -705,6 +721,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--agent", default="stg")
     p.add_argument("--runner", default="manual", choices=["manual", "herdr", "herdr-app", "noop"])
     p.add_argument("--auto", action="store_true")
+    p.add_argument("--detach", action="store_true")
     p.add_argument("--no-sandbox", action="store_true")
     p.set_defaults(func=cmd_run)
 

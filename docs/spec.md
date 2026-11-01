@@ -27,7 +27,7 @@ Herdr, pi, ручной запуск — адаптеры на краю. Пер�
   файла), ни одна задача не слита — интеграционной станции нет;
 - kit доски лежит в `~/.zcode/workspace/draft-.../stigmergy-kit`, вне git;
 - привязки: `bench/pilot.py` знает `~/.zcode/cli/zcode-headless.cjs`,
-  `AGENTS.md` предписывает `orca worktree`, HUD читает sqlite ZCode и `bd`.
+  `AGENTS.md` больше не предписывает внешний worktree-менеджер; HUD читает sqlite ZCode и `bd`.
 
 Урок «Dark factory»: тёмная фабрика — контур, где человек задаёт критерий, но не
 выносит вердикт; вход — decision procedure; оракул якорный и живой; ущерб

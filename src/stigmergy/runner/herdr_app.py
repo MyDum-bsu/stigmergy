@@ -122,6 +122,19 @@ def create_space(app: str, name: str, folder: Path, agent: str, task: str) -> di
     )
 
 
+def create_tab(app: str, space: str, name: str, folder: Path, agent: str, task: str) -> dict:
+    ensure_app(app)
+    return _do(
+        app,
+        "tab.new",
+        name=name,
+        space=space,
+        folder=str(folder),
+        argv=[agent],
+        task=task,
+    )
+
+
 def hc(*args: str, timeout: int = 30) -> tuple[int, str]:
     proc = subprocess.run(
         ["hc", *args],
@@ -215,17 +228,37 @@ def wait_until_settled(terminal: str, deadline_s: int = 1800) -> str:
 class HerdrAppRunner:
     kind = "herdr-app"
 
-    def __init__(self, app: str = DEFAULT_APP, agent: str = DEFAULT_AGENT, timeout_s: int = 1800):
+    def __init__(
+        self,
+        app: str = DEFAULT_APP,
+        agent: str = DEFAULT_AGENT,
+        timeout_s: int = 1800,
+        space: str | None = None,
+        tab_name: str | None = None,
+    ):
         self.app = app
         self.agent = agent
         self.timeout_s = timeout_s
+        self.space = space
+        self.tab_name = tab_name
 
     def start(self, task_id: str, prompt: str, workspace: Path, wait: bool = True) -> RunnerHandle:
-        created = create_space(self.app, f"{PREFIX}{task_id}", workspace, self.agent, prompt)
-        space = str(created.get("space", ""))
+        if self.space:
+            created = create_tab(
+                self.app,
+                self.space,
+                self.tab_name or f"stg-{task_id}",
+                workspace,
+                self.agent,
+                prompt,
+            )
+            space = self.space
+        else:
+            created = create_space(self.app, f"{PREFIX}{task_id}", workspace, self.agent, prompt)
+            space = str(created.get("space", ""))
         terminal = str(created.get("terminal", ""))
         if not space or not terminal:
-            raise HerdrAppError(f"space.new returned no ids: {created}")
+            raise HerdrAppError(f"space.new/tab.new returned no ids: {created}")
         if wait:
             wait_until_settled(terminal, self.timeout_s)
         return RunnerHandle(

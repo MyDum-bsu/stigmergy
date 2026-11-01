@@ -110,6 +110,8 @@ def start_episode(
     runner: str = "manual",
     *,
     wait_runner: bool = True,
+    space: str | None = None,
+    tab_name: str | None = None,
 ) -> tuple[EpisodeResult, str]:
     state = state_of(board, config.name)
     task = state.task(task_id)
@@ -141,6 +143,8 @@ def start_episode(
             app=str(config.runner.get("app", "herdr-app")),
             agent=str(config.runner.get("agent", "pi")),
             timeout_s=int(config.runner.get("prompt_timeout_s", 1800)),
+            space=space,
+            tab_name=tab_name,
         )
         try:
             handle = app_runner.start(task.id, prompt, wt.path, wait=wait_runner)

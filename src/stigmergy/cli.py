@@ -416,6 +416,29 @@ def cmd_merge(args: argparse.Namespace) -> int:
 
 
 # ── dash / status / doctor ─────────────────────────────────────────────────
+def cmd_wave(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from stigmergy.wave import create_wave
+
+    data = create_wave(
+        config,
+        board,
+        args.goal,
+        args.tasks,
+        agent=args.agent,
+        runner=args.runner,
+        app=args.app,
+    )
+    text = (
+        f"wave {data['wave']} space {data['space']} lead {data['lead']}\n"
+        + "\n".join(
+            f"worker {worker['task']} terminal {worker['terminal']}" for worker in data["workers"]
+        )
+    )
+    _emit(args, data, text)
+    return 0
+
+
 def cmd_dash(args: argparse.Namespace) -> int:
     if args.open:
         webbrowser.open(f"http://127.0.0.1:{args.port}")
@@ -747,6 +770,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("--agent", default="stg")
     p.set_defaults(func=cmd_merge)
+
+    p = sub.add_parser("wave", help="one Herdr space: lead + worker tabs")
+    p.add_argument("--goal", required=True)
+    p.add_argument("--tasks", nargs="+", required=True)
+    p.add_argument("--agent", default="stg")
+    p.add_argument("--runner", default="herdr-app", choices=["herdr-app", "herdr", "manual", "noop"])
+    p.add_argument("--app", default="herdr-app")
+    p.set_defaults(func=cmd_wave)
 
     p = sub.add_parser("dash", help="local dashboard")
     p.add_argument("--port", type=int, default=8787)

@@ -4,7 +4,12 @@
 
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { agents, panes, spaces, terminals, home, run, theme } from "herdr";
+import { agents, panes, spaces, terminals, home, run, theme, exec } from "herdr";
+
+// The board this panel reads. One project for now; the mod can take a prop
+// later when several boards share the app.
+const BOARD = "/home/mydum/Desktop/projects/optimization";
+
 
 // Whom to look at first; cards and counters both follow this order.
 const RANK = { blocked: 0, working: 1, done: 2, idle: 3 };
@@ -44,8 +49,43 @@ export default class MissionControl extends View {
     // When each agent's status was last seen to change: the duration a card
     // shows. Kept across restarts, as the agents mod keeps its own marks.
     this.since = JSON.parse(localStorage.getItem("since") ?? "{}");
+    this.board = null;
+    this.boardError = null;
+    this.boardLoading = false;
     // Durations age while nothing else moves, so the panel redraws itself.
     cx.timer.every(30000, (cx) => cx.notify());
+    this.loadBoard(cx);
+    cx.timer.every(8000, (cx) => this.loadBoard(cx));
+  }
+
+  // The board is a child process, not an app API: read it on a slow timer and
+  // keep the previous snapshot if a call fails.
+  loadBoard(cx) {
+    if (this.boardLoading) return;
+    this.boardLoading = true;
+    cx.spawn(async (cx) => {
+      try {
+        const [list, log, status] = await Promise.all([
+          exec("stg", ["--board", BOARD, "board", "list", "--json"]),
+          exec("stg", ["--board", BOARD, "board", "log", "--limit", "40", "--json"]),
+          exec("stg", ["--board", BOARD, "status", "--json"]),
+        ]);
+        if (list.code !== 0) throw new Error(list.stderr || "stg board list failed");
+        if (log.code !== 0) throw new Error(log.stderr || "stg board log failed");
+        if (status.code !== 0) throw new Error(status.stderr || "stg status failed");
+        this.board = {
+          tasks: JSON.parse(list.stdout),
+          events: JSON.parse(log.stdout),
+          status: JSON.parse(status.stdout),
+        };
+        this.boardError = null;
+      } catch (e) {
+        this.boardError = String(e?.message ?? e);
+      } finally {
+        this.boardLoading = false;
+        cx.notify();
+      }
+    });
   }
 
   track(list, now) {
@@ -141,7 +181,10 @@ export default class MissionControl extends View {
   }
 
   chip(t, status) {
-    const color = t[status] ?? t.dim;
+    const color =
+      t[status] ??
+      { queued: t.accent, claimed: t.working, workspace: t.working, episode: t.working, gated: t.done }[status] ??
+      t.dim;
     return h_flex()
       .flex_none()
       .gap(4)
@@ -282,6 +325,119 @@ export default class MissionControl extends View {
       );
   }
 
+  boardCounters(t, counts) {
+    const items = [
+      ["queued", t.accent],
+      ["active", t.working],
+      ["gated", t.done],
+      ["done", t.muted],
+    ];
+    return h_flex()
+      .px(12)
+      .pb(4)
+      .gap(6)
+      .flex_none()
+      .children(
+        items.map(([label, color]) => {
+          const n = counts[label] ?? 0;
+          return v_flex()
+            .flex_1()
+            .min_w(0)
+            .gap(1)
+            .p(7)
+            .rounded(9)
+            .bg(glass(color, n ? "18" : "08"))
+            .border(1)
+            .border_color(glass(color, n ? "33" : "14"))
+            .child(div().text_size(13).font_semibold().text_color(n ? color : t.dim).child(String(n)))
+            .child(div().text_size(9.5).text_color(t.dim).child(label));
+        }),
+      );
+  }
+
+  boardSection(t, now) {
+    const b = this.board;
+    if (!b) {
+      return v_flex()
+        .child(this.section(t, "Board", null))
+        .child(this.empty(t, this.boardError ?? "Loading board\u2026"));
+    }
+    const counts = b.status?.status ?? {};
+    const queued = counts.queued ?? 0;
+    const active = (counts.claimed ?? 0) + (counts.workspace ?? 0) + (counts.episode ?? 0);
+    const gated = counts.gated ?? 0;
+    const done = counts.done ?? 0;
+    const tasks = (b.tasks ?? [])
+      .filter((task) => ["queued", "claimed", "workspace", "episode", "gated"].includes(task.status))
+      .sort((x, y) => (x.priority ?? 9) - (y.priority ?? 9))
+      .slice(0, 6);
+    const isGate = (event) => /^(gate|control|integration|merge)\./.test(event.action);
+    const gateEvents = (b.events ?? []).filter(isGate).slice(-5).reverse();
+    const other = (b.events ?? []).filter((event) => !isGate(event)).slice(-5).reverse();
+    return v_flex()
+      .child(this.section(t, "Board", `${queued} queued`, t.accent))
+      .when(Boolean(this.boardError), (el) => el.child(this.empty(t, this.boardError)))
+      .child(this.boardCounters(t, { queued, active, gated, done }))
+      .when(tasks.length === 0, (el) => el.child(this.empty(t, "Queue is empty.")))
+      .children(tasks.map((task) => this.taskRow(t, task)))
+      .child(this.section(t, "Gates / merge", null))
+      .when(gateEvents.length === 0, (el) => el.child(this.empty(t, "No gate events yet.")))
+      .children(gateEvents.map((event) => this.eventRow(t, event, now, true)))
+      .child(this.section(t, "Events", null))
+      .when(other.length === 0, (el) => el.child(this.empty(t, "No events yet.")))
+      .children(other.map((event) => this.eventRow(t, event, now, false)));
+  }
+
+  taskRow(t, task) {
+    return h_flex()
+      .mb(5)
+      .p(7)
+      .gap(7)
+      .rounded(8)
+      .items_center()
+      .bg(glass(t.raised, "cc"))
+      .border(1)
+      .border_color(t.border)
+      .child(this.chip(t, task.status))
+      .child(
+        div()
+          .flex_1()
+          .min_w(0)
+          .truncate()
+          .text_size(11.5)
+          .text_color(t.foreground)
+          .child(`${task.id} \u00b7 ${task.title}`),
+      )
+      .child(div().flex_none().text_size(9.5).text_color(t.dim).child(`P${task.priority ?? "-"}`));
+  }
+
+  eventRow(t, event, now, gate) {
+    const action = String(event.action ?? "");
+    const color = action.endsWith(".failed")
+      ? t.blocked
+      : /(passed|done|merge)/.test(action)
+        ? t.done
+        : t.accent;
+    const task = event.attributes?.["task.id"] ?? "";
+    const at = Number(event.timeUnixNano ?? 0) / 1e6;
+    const age = at ? duration(Math.max(0, now - at)) : "";
+    return h_flex()
+      .mb(4)
+      .gap(6)
+      .items_center()
+      .child(div().size(5).rounded(3).flex_none().bg(color))
+      .child(
+        div()
+          .flex_1()
+          .min_w(0)
+          .truncate()
+          .text_size(10.5)
+          .text_color(gate ? color : t.muted)
+          .child(`${action}${task ? ` \u00b7 ${task}` : ""}`),
+      )
+      .child(div().flex_none().text_size(9.5).text_color(t.dim).child(age));
+  }
+
   render() {
     const t = theme();
     const now = Date.now();
@@ -316,6 +472,7 @@ export default class MissionControl extends View {
               .pb(16)
               .overflow_y_scrollbar()
               .mode("always")
+              .child(this.boardSection(t, now))
               .child(this.section(t, "Agents", counts.blocked ? `${counts.blocked} need you` : null, t.blocked))
               .when(list.length === 0, (el) => el.child(this.empty(t, "No agent reports a status yet.")))
               .children(list.map((agent) => this.agentCard(t, agent, words, now)))

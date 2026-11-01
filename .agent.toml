@@ -1,0 +1,28 @@
+[project]
+name = "stigmergy"
+base = "dev"
+protected = ["main"]
+wip = 1
+
+[workspace]
+provider = "git"
+root = ".factory/worktrees"
+
+[gate]
+timeout_seconds = 900
+network = false
+
+[sandbox]
+engine = "bwrap"
+episode_network = "proxy"
+gate_network = "none"
+
+[runner]
+kind = "herdr-app"
+app = "herdr-app"
+agent = "pi"
+
+[risk]
+low = "auto"
+medium = "auto"
+high = "human"

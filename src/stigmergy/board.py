@@ -113,6 +113,39 @@ def propose_task(board: Board, config: Config, task_id: str, title: str, **kwarg
     return board.append("task.proposed", _actor(kwargs.get("agent", "triage")), attrs, f"propose {task_id}")
 
 
+def attach_spec(
+    board: Board,
+    config: Config,
+    task_id: str,
+    spec_path: str,
+    agent: str = "architect",
+) -> dict:
+    """Attach a spec to a queued task without inventing a duplicate task."""
+    state = ProjectState.from_events(board.read(), project=config.name)
+    task = state.task(task_id)
+    base = task.base or config.base
+    spec = load_for(config.root, base, spec_path)
+    errors = spec.validate_against_repo(config.root, base)
+    if errors:
+        raise SpecError("; ".join(errors))
+    return board.append(
+        "spec.attached",
+        _actor(agent),
+        _attrs(
+            config.name,
+            task_id,
+            {
+                "spec.path": spec_path,
+                "spec.sha": spec.sha,
+                "risk": spec.risk,
+                "paths.allowed": spec.allowed_paths,
+                "spec.deps": spec.deps,
+            },
+        ),
+        f"attach spec {task_id}",
+    )
+
+
 def approve(board: Board, config: Config, task_id: str, by: str) -> dict:
     if by != "human":
         raise BoardError("approve is human-only: pass --by human")

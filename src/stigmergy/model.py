@@ -150,6 +150,11 @@ class ProjectState:
         elif action == "task.approved":
             task.status = QUEUED
             task.spec_sha = attrs.get("spec.sha", task.spec_sha)
+        elif action == "spec.attached":
+            task.spec = attrs.get("spec.path", task.spec)
+            task.spec_sha = attrs.get("spec.sha", task.spec_sha)
+            task.risk = attrs.get("risk", task.risk)
+            task.allowed_paths = list(attrs.get("paths.allowed") or task.allowed_paths)
         elif action == "task.rejected":
             task.status = REJECTED
             task.answer = attrs.get("answer", "")

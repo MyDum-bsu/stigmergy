@@ -114,6 +114,9 @@ def cmd_board(args: argparse.Namespace) -> int:
     if cmd == "approve":
         _emit(args, board_mod.approve(board, config, args.id, args.by))
         return 0
+    if cmd == "spec":
+        _emit(args, board_mod.attach_spec(board, config, args.id, args.spec, args.agent))
+        return 0
     if cmd == "reject":
         _emit(args, board_mod.reject(board, config, args.id, args.by, args.reason or ""))
         return 0
@@ -620,6 +623,11 @@ def build_parser() -> argparse.ArgumentParser:
     q = b.add_parser("approve")
     q.add_argument("id")
     q.add_argument("--by", required=True)
+    q.set_defaults(func=cmd_board)
+    q = b.add_parser("spec")
+    q.add_argument("id")
+    q.add_argument("--spec", required=True)
+    q.add_argument("--agent", default="architect")
     q.set_defaults(func=cmd_board)
     q = b.add_parser("reject")
     q.add_argument("id")

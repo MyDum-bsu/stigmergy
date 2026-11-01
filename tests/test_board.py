@@ -38,6 +38,17 @@ def test_add_claim_block_answer_done(repo: Path) -> None:
         assert (board.views_dir / name).exists()
 
 
+def test_attach_spec_to_existing_task(repo: Path) -> None:
+    board = Board(repo)
+    config = Config.load(repo)
+    board_mod.add_task(board, config, "T1", "No spec yet")
+    board_mod.attach_spec(board, config, "T1", "specs/T1.md")
+    task = _state(board).task("T1")
+    assert task.spec == "specs/T1.md"
+    assert task.spec_sha
+    assert task.status == "queued"
+
+
 def test_human_only_approve(repo: Path) -> None:
     board = Board(repo)
     config = Config.load(repo)

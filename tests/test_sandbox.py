@@ -10,7 +10,7 @@ def test_worker_argv_masks_secrets_and_binds_worktree(tmp_path: Path) -> None:
     root = tmp_path / "repo"
     worktree.mkdir()
     (root / ".agent").mkdir(parents=True)
-    argv = sandbox.worker_argv(worktree, root, "pi", ["--exclude-tools", "AskUserQuestion"])
+    argv = sandbox.worker_argv(worktree, root, "pi", ["--exclude-tools", "AskUserQuestion"], aa_profile="")
     assert argv[0] == "bwrap"
     assert "--ro-bind" in argv
     assert str(worktree) in argv

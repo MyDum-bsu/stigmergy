@@ -78,13 +78,11 @@ def episode_argv(
 
 
 def _aa_profile() -> str:
-    """Herdr terminals are AppArmor 'unconfined'; userns needs the zcode profile."""
-    try:
-        current = Path("/proc/self/attr/current").read_text(encoding="utf-8").strip()
-    except OSError:
-        return ""
-    if "unconfined" not in current or current.startswith("zcode"):
-        return ""
+    """Herdr terminals are AppArmor 'unconfined'; userns needs the zcode profile.
+
+    Probe in the caller, not via the caller's current profile: the tab is
+    started later by Herdr and may have a different profile.
+    """
     exe = shutil.which("aa-exec")
     if not exe:
         return ""

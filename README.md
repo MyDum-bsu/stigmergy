@@ -51,14 +51,14 @@ stg critique <ID>                       # независимый critic, дру�
 
 ## Состояние (2026-11-01)
 
-Реализованы S0–S7 и P0 dark factory: intake, plan approval + HTML artifact,
+Реализованы S0–S7, P0 dark factory и M1 trust baseline (human token, watchdog, sandbox planner/lead): intake, plan approval + HTML artifact,
 dispatcher, lead-канал, judge/decisions, metrics/audit, weekly retro, critic
 tab, source idempotency. Formal TLA+/TLC, auto-judge, enforced critic,
 proactive watchers, Telegram/GitHub and cost telemetry — следующие слои.
 
 Проверено в этом окружении:
 
-- `uv run pytest -q` — 77 passed; `uv run ruff check .` — clean.
+- `uv run pytest -q` — 81 passed; `uv run ruff check .` — clean.
 - T5 end-to-end на клоне `optimization`: `stg run T5-land --runner noop --auto
   --no-sandbox` → `gate.passed`, `control.proven`, `integration.passed`,
   `merge.done`; `dev` fast-forward на `a9f57f6`, `.beads` не в дереве,

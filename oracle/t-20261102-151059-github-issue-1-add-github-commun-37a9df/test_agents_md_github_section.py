@@ -3,7 +3,15 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-AGENTS = Path(__file__).resolve().parents[1] / "AGENTS.md"
+def _agents() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "AGENTS.md"
+        if candidate.is_file() and (parent / "pyproject.toml").is_file():
+            return candidate
+    raise AssertionError("AGENTS.md next to pyproject.toml not found")
+
+
+AGENTS = _agents()
 
 REQUIRED_TOKENS = ("gh issue", "gh pr", "stg board", "MyDum-bsu/stigmergy")
 REQUIRED_HEADINGS = ("# Stigmergy", "## Работа", "## Приёмка", "## Ветки")

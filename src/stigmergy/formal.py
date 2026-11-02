@@ -109,6 +109,40 @@ def live_violations(config: Config, board: Board) -> list[str]:
     return out
 
 
+def verify_task(config: Config, spec, base: str) -> dict:
+    """Run a task-specific TLA+ model and its mutant, if the spec has one."""
+    from stigmergy.spec import Spec
+
+    if not isinstance(spec, Spec):
+        raise TypeError("spec must be a Spec")
+    formal = spec.formal
+    if not formal:
+        return {"ok": False, "detail": "spec has no formal block", "model": None, "mutant": None}
+    def resolve(value: str) -> Path:
+        path = Path(value)
+        return path if path.is_absolute() else config.root / path
+    model = resolve(str(formal.get("model", "")))
+    cfg = resolve(str(formal.get("config", "")))
+    mutant_model = resolve(str(formal.get("mutant_model", "")))
+    mutant_cfg = resolve(str(formal.get("mutant_cfg") or formal.get("mutant_config") or ""))
+    good = run_tlc(model, cfg)
+    mutant = (
+        run_tlc(mutant_model, mutant_cfg)
+        if mutant_model.is_file() and mutant_cfg.is_file()
+        else {"ok": True, "output": "", "detail": "no mutant configured"}
+    )
+    text_out = str(mutant.get("output", "")).lower()
+    rejected = not mutant["ok"] and ("violat" in text_out or "error" in text_out)
+    passed = bool(good["ok"] and rejected)
+    return {
+        "ok": passed,
+        "model": good,
+        "mutant": mutant,
+        "mutant_rejected": rejected,
+        "base": base,
+    }
+
+
 def verify_core(config: Config, board: Board | None = None) -> dict[str, Any]:
     good = run_tlc(MODELS / "TaskLifecycle.tla", MODELS / "TaskLifecycle.cfg")
     broken = run_tlc(

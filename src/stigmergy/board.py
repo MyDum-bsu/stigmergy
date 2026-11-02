@@ -278,13 +278,13 @@ def worker_done(board: Board, config: Config, task_id: str, agent: str) -> dict:
 
 
 def answer(board: Board, config: Config, task_id: str, by: str, text: str) -> dict:
-    if by not in {"human", "lead"}:
-        raise BoardError("answer is human-only or lead-only: pass --by human|lead")
+    if by not in {"human", "lead", "judge"}:
+        raise BoardError("answer is human-only, lead-only or judge-only: pass --by human|lead|judge")
     state = ProjectState.from_events(board.read(), project=config.name)
     task = state.task(task_id)
-    if by == "lead" and task.risk == "high":
+    if by in {"lead", "judge"} and task.risk == "high":
         raise BoardError("high-risk answer is human-only")
-    actor = _actor("human", "human") if by == "human" else _actor("lead", "agent")
+    actor = _actor("human", "human") if by == "human" else _actor(by, "agent")
     return board.append(
         "task.answered",
         actor,

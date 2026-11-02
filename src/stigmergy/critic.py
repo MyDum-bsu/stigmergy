@@ -21,6 +21,37 @@ CRITIC_TAB = "Critic · "
 DEFAULT_CRITIC_ARGS = ["--exclude-tools", "edit,write,AskUserQuestion"]
 
 
+def report_path(config: Config, task_id: str) -> Path:
+    return config.root / ".factory" / "critic" / f"{task_id}.json"
+
+
+def evaluate(config: Config, task_id: str) -> dict:
+    """Enforce the independent-critic verdict: high findings block high risk."""
+    import json
+
+    path = report_path(config, task_id)
+    if not path.exists():
+        return {"ok": False, "detail": f"critic report missing: {path}", "findings": []}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return {"ok": False, "detail": f"bad critic report: {exc}", "findings": []}
+    findings = data.get("findings") or []
+    blocking = []
+    for finding in findings:
+        frequency = max(0, min(10, int(finding.get("frequency", 0))))
+        harm = max(0, min(10, int(finding.get("harm", 0))))
+        if frequency * harm >= 5:
+            blocking.append({**finding, "frequency": frequency, "harm": harm})
+    return {
+        "ok": not blocking,
+        "detail": "" if not blocking else f"{len(blocking)} blocking critic finding(s)",
+        "findings": findings,
+        "blocking": blocking,
+        "path": str(path),
+    }
+
+
 def _git(path: Path, *args: str) -> str:
     proc = subprocess.run(
         ["git", "-C", str(path), *args],
@@ -39,6 +70,7 @@ def critic_prompt(
     commit: str,
     diff_stat: str,
     prd: str,
+    report_path: str,
 ) -> str:
     return f"""You are the independent critic for task {task_id}.
 
@@ -58,10 +90,11 @@ Diff stat:
 PRD:
 {prd or "(no PRD)"}
 
-Output only findings as:
-  finding | frequency 1..10 | harm 1..10 | evidence (file:line or command)
-If frequency × harm < 5, put it in the catalog and do not block. Do not edit
-files, do not run the gate, do not merge. The gate is the verdict.
+Output a JSON report to:
+  {report_path}
+with findings: [{{kind, frequency, harm, evidence}}]. If frequency × harm < 5,
+put it in the catalog and do not block. Do not edit files, do not run the gate,
+do not merge. The gate is the verdict.
 """
 
 
@@ -95,6 +128,7 @@ def start_critic(
         commit=commit,
         diff_stat=diff_stat,
         prd=_prd(config, task_id),
+        report_path=str(report_path(config, task_id)),
     )
     space_name = str(config.runner.get("space", "") or "") or "optimization"
     space = herdr_app.ensure_space(app, space_name, config.root)

@@ -119,6 +119,11 @@ Spec frontmatter (YAML, exact keys):
   oracle_paths: [<tests that define the criterion; must exist after approval>]
   gate_inputs: [<configs restored from base>]
   invariants: [<for high risk: state/order/duplication invariants, in words>]
+  formal:
+    model: oracle/<ID>/Task.tla
+    config: oracle/<ID>/Task.cfg
+    mutant_model: oracle/<ID>/TaskMutant.tla
+    mutant_cfg: oracle/<ID>/TaskMutant.cfg
   skills: [<optional agent skill paths, e.g. ~/.agents/skills/code-review/SKILL.md>]
   dod: "<one shell command: fails before, passes after>"
   negative_control:
@@ -348,6 +353,17 @@ def _copy_plan_files(source: Path, target: Path, task_id: str) -> list[str]:
             dst.write_bytes(item.read_bytes())
             copied.append(str(part))
     return copied
+
+
+def reject_plan(config: Config, board: Board, task_id: str, reason: str) -> dict:
+    if not reason.strip():
+        raise BoardError("reject reason is required")
+    return board.append(
+        "task.rejected",
+        {"kind": "human", "name": "human"},
+        {"project.name": config.name, "task.id": task_id, "answer": reason},
+        f"reject plan {task_id}",
+    )
 
 
 def approve_plan(

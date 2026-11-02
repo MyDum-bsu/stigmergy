@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
+from stigmergy import usage as usage_mod
 from stigmergy.config import Config
 from stigmergy.log import Board
 from stigmergy.model import ProjectState
@@ -67,6 +68,7 @@ def snapshot(config: Config, board: Board) -> dict[str, Any]:
         "lead_answers": lead_answers,
         "retries": sum(task.retries for task in tasks),
         "anonymous": anonymous(events),
+        "usage": usage_mod.totals(board),
         "actions": dict(actions.most_common()),
     }
 

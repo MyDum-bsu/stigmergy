@@ -374,10 +374,20 @@ def run_gate(
         )
         formal = None
         if spec.risk == "high":
-            from stigmergy.formal import verify_core
+            from stigmergy.formal import verify_core, verify_task
 
-            formal = verify_core(config)
-            passed = passed and bool(formal.get("passed"))
+            core = verify_core(config)
+            task_formal = verify_task(config, spec, base)
+            from stigmergy.critic import evaluate as critic_evaluate
+
+            critic = critic_evaluate(config, spec.id)
+            formal = {"core": core, "task": task_formal, "critic": critic}
+            passed = (
+                passed
+                and bool(core.get("passed"))
+                and bool(task_formal.get("ok"))
+                and bool(critic.get("ok"))
+            )
         result = GateResult(
             task=spec.id,
             episode=episode,

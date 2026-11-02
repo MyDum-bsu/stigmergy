@@ -16,8 +16,11 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from stigmergy import board as board_mod
+from stigmergy import judge as judge_mod
 from stigmergy.config import Config
 from stigmergy.episode import start_episode, state_of
+from stigmergy.lead import runner_handle
 from stigmergy.log import Board
 from stigmergy.model import ACTIVE_STATIONS
 from stigmergy.runner import herdr_app
@@ -132,6 +135,30 @@ def worker_done_seq(board: Board, task_id: str) -> int:
     return done if done > max(start, answer) else 0
 
 
+
+
+def watch_all(
+    projects: list[tuple[Config, Board]],
+    *,
+    app: str = DEFAULT_APP,
+    interval: int = DEFAULT_INTERVAL,
+    on_tick: Callable[[dict[str, Any]], None] | None = None,
+) -> None:
+    """Global loop: one lock per project, one deterministic tick each."""
+    handles = []
+    try:
+        for config, _board in projects:
+            handles.append(lock(config))
+        while True:
+            for config, board in projects:
+                result = tick(config, board, app=app)
+                if on_tick:
+                    on_tick({"project": config.name, **result})
+            time.sleep(max(1, interval))
+    finally:
+        for handle in handles:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            handle.close()
 def tick(
     config: Config,
     board: Board,
@@ -147,6 +174,7 @@ def tick(
     """One deterministic pass. Returns what changed, without running forever."""
     dispatcher_cfg = config.section("dispatcher")
     auto_finish = bool(dispatcher_cfg.get("auto_finish", True)) if auto_finish is None else auto_finish
+    auto_judge = bool(dispatcher_cfg.get("auto_judge", False))
     max_retries = int(dispatcher_cfg.get("max_retries", 1)) if max_retries is None else max_retries
     start_fn = start or start_episode
     finish_fn = finish or _finish
@@ -183,6 +211,33 @@ def tick(
     for task in blocked:
         if notified.get(task.id) == task.last_seq:
             continue
+        if auto_judge and task.risk != "high":
+            decision = judge_mod.decide(config, task.question)
+            if decision["outcome"] == "resolved":
+                board_mod.answer(
+                    board,
+                    config,
+                    task.id,
+                    "judge",
+                    decision["decision"],
+                )
+                handle = runner_handle(board, task.id)
+                sent = False
+                if handle:
+                    sent, _detail = herdr_app.send_paused(
+                        handle,
+                        f"Судья: {decision['decision']}\n\nПродолжай.",
+                    )
+                actions.append(
+                    {
+                        "action": "judge_answer",
+                        "task": task.id,
+                        "decision": decision["decision"],
+                        "sent": sent,
+                    }
+                )
+                notified[task.id] = task.last_seq
+                continue
         message = (
             f"Worker {task.id} blocked: {task.question}\n"
             f"Ответ: stg lead answer {task.id} --text \"...\""

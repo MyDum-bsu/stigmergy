@@ -29,6 +29,14 @@ stg dispatcher --once                   # один тик
 stg dispatcher --watch                  # демон: старт/финиш/уведомления
 stg dispatcher --all --once             # один тик по registry
 stg judge search "куда деплоить"
+stg judge decide "куда деплоить?"
+stg judge eval
+stg judge import --file decisions/nightly.jsonl
+stg usage add --task <ID> --stage check --prompt-tokens 100
+stg learn --days 7
+stg feed --file .factory/inbox.jsonl
+stg mutation <ID>
+stg mirror github
 stg judge add "куда деплоить?" --decision "только через поезд" \
   --quote "не выкатываем без гейта" --source decisions/runbook.md
 stg metrics                             # human touches, gate failures, anonymous
@@ -58,7 +66,7 @@ proactive watchers, Telegram/GitHub and cost telemetry — следующие с
 
 Проверено в этом окружении:
 
-- `uv run pytest -q` — 81 passed; `uv run ruff check .` — clean.
+- `uv run pytest -q` — 95 passed; `uv run ruff check .` — clean.
 - T5 end-to-end на клоне `optimization`: `stg run T5-land --runner noop --auto
   --no-sandbox` → `gate.passed`, `control.proven`, `integration.passed`,
   `merge.done`; `dev` fast-forward на `a9f57f6`, `.beads` не в дереве,

@@ -25,7 +25,7 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "keep_workspace": True,
     },
     "risk": {"low": "auto", "medium": "auto", "high": "human"},
-    "dispatcher": {"auto_finish": True, "interval_seconds": 5, "max_retries": 1},
+    "dispatcher": {"auto_finish": True, "interval_seconds": 5, "max_retries": 1, "auto_judge": True},
 }
 
 

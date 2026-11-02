@@ -170,6 +170,11 @@ class Spec:
         return [str(item) for item in raw] if isinstance(raw, list) else []
 
     @property
+    def formal(self) -> dict[str, Any]:
+        raw = self.meta.get("formal") or {}
+        return raw if isinstance(raw, dict) else {}
+
+    @property
     def invariants(self) -> list[str]:
         raw = self.meta.get("invariants") or []
         return [str(item) for item in raw] if isinstance(raw, list) else []

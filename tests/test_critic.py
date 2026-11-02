@@ -9,9 +9,17 @@ from stigmergy.log import Board
 
 
 def test_critic_prompt_has_frequency_and_harm() -> None:
-    text = critic.critic_prompt(Config.load(Path(".")), "T1", base="dev", commit="abc", diff_stat="1 file", prd="goal")
-    assert "frequency 1..10" in text
-    assert "harm 1..10" in text
+    text = critic.critic_prompt(
+        Config.load(Path(".")),
+        "T1",
+        base="dev",
+        commit="abc",
+        diff_stat="1 file",
+        prd="goal",
+        report_path="/tmp/report.json",
+    )
+    assert "frequency" in text and "harm" in text
+    assert "/tmp/report.json" in text
     assert "money, data" in text
 
 

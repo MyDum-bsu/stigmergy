@@ -442,6 +442,17 @@ def cmd_verify(args: argparse.Namespace) -> int:
     _root, config, board = _ctx(args)
     from stigmergy import formal
 
+    if args.id:
+        from stigmergy.spec import load_for
+
+        state = _state(board, config)
+        task = state.task(args.id)
+        spec = load_for(config.root, task.base or config.base, task.spec)
+        core = formal.verify_core(config, board)
+        task_formal = formal.verify_task(config, spec, task.base or config.base)
+        data = {"core": core, "task": task_formal, "passed": bool(core["passed"] and task_formal["ok"])}
+        _emit(args, data, f"formal task={args.id} core={core['passed']} task_model={task_formal['ok']}")
+        return 0 if data["passed"] else 1
     data = formal.verify_core(config, board)
     _emit(args, data, formal.text(data))
     return 0 if data["passed"] else 1
@@ -458,6 +469,82 @@ def cmd_retro(args: argparse.Namespace) -> int:
     else:
         _emit(args, data, retro.render(data))
     return 0
+
+
+def cmd_mutation(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from stigmergy import mutation
+    from stigmergy.spec import load_for
+
+    state = _state(board, config)
+    task = state.task(args.id)
+    commit = task.commit
+    if not commit:
+        from stigmergy.workspace import rev_parse
+
+        commit = rev_parse(config.workspace_root / f"{task.id}-{task.sha}", "HEAD")
+    spec = load_for(config.root, task.base or config.base, task.spec)
+    commands = [str(item) for item in (spec.meta.get("mutations") or [])]
+    data = mutation.run(config, commit, commands)
+    _emit(args, data, f"mutation: {'PASS' if data['ok'] else 'FAIL'} survivors={len(data['survivors'])}")
+    return 0 if data["ok"] else 1
+
+
+def cmd_mirror(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from stigmergy import mirror
+
+    if args.apply:
+        data = mirror.apply(config, board)
+    else:
+        items = mirror.payloads(config, board)
+        data = {"ok": True, "dry_run": True, "items": items}
+    _emit(args, data, json.dumps(data, ensure_ascii=False))
+    return 0 if data.get("ok") else 1
+
+
+def cmd_usage(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from stigmergy import usage
+
+    data = usage.record(
+        config,
+        board,
+        task_id=args.task,
+        stage=args.stage,
+        model=args.model,
+        prompt_tokens=args.prompt_tokens,
+        completion_tokens=args.completion_tokens,
+        duration_ms=args.duration_ms,
+        cost_usd=args.cost_usd,
+    )
+    _emit(args, data, f"usage {args.task} {args.stage}")
+    return 0
+
+
+def cmd_learn(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from stigmergy import learn
+
+    path = learn.propose(config, board, days=args.days)
+    _emit(args, {"path": str(path)}, str(path))
+    return 0
+
+
+def cmd_feed(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from pathlib import Path
+
+    from stigmergy import feed
+
+    data = feed.ingest(
+        config,
+        board,
+        Path(args.file),
+        start_planner=not args.no_planner,
+    )
+    _emit(args, data, f"feed: {len(data)} item(s)")
+    return 0 if not any(item.get("error") for item in data) else 1
 
 
 def cmd_human(args: argparse.Namespace) -> int:
@@ -543,6 +630,17 @@ def cmd_plan(args: argparse.Namespace) -> int:
         path = intake.render_plan(config, args.id)
         _emit(args, {"path": str(path)}, str(path))
         return 0
+    if args.plan_cmd == "serve":
+        from stigmergy import planui
+
+        planui.serve(
+            config,
+            board,
+            args.id,
+            port=args.port,
+            open_browser=args.open,
+        )
+        return 0
     if args.plan_cmd == "approve":
         from stigmergy import human
 
@@ -558,12 +656,25 @@ def cmd_dispatcher(args: argparse.Namespace) -> int:
     from stigmergy import dispatcher
 
     if args.all:
-        if args.watch:
-            raise BoardError("--all is one-shot; run one service per project")
         from stigmergy.config import Config
         from stigmergy.log import Board
         from stigmergy.registry import load as registry_load
 
+        projects = [
+            (Config.load(Path(item["root"])), Board(Path(item["root"])))
+            for item in registry_load()
+        ]
+        if args.watch:
+            def show_global(result: dict) -> None:
+                print(json.dumps(result, ensure_ascii=False), flush=True)
+
+            dispatcher.watch_all(
+                projects,
+                app=args.app,
+                interval=args.interval,
+                on_tick=show_global,
+            )
+            return 0
         results = []
         for item in registry_load():
             root = Path(item["root"])
@@ -614,6 +725,19 @@ def cmd_judge(args: argparse.Namespace) -> int:
         lines = [f"{item['id']}\t{item['date']}\t{item['question']}" for item in items]
         _emit(args, items, "\n".join(lines) or "no decisions")
         return 0
+    if args.judge_cmd == "decide":
+        data = judge.decide(config, " ".join(args.query))
+        _emit(args, data, f"{data['outcome']}: {data['decision'] or data['reason']}")
+        return 0
+    if args.judge_cmd == "eval":
+        data = judge.evaluate(config, Path(args.cases) if args.cases else None)
+        verdict = "PASS" if data["ok"] else "FAIL"
+        _emit(args, data, f"judge eval: {verdict} {data.get('correct', 0)}/{data.get('total', 0)}")
+        return 0 if data["ok"] else 1
+    if args.judge_cmd == "import":
+        data = judge.import_file(config, Path(args.file))
+        _emit(args, data, f"judge import: {data['imported']} imported, {data['errors']} errors")
+        return 0 if data["errors"] == 0 else 1
     if args.judge_cmd == "add":
         item = judge.add(
             config,
@@ -1046,6 +1170,11 @@ def build_parser() -> argparse.ArgumentParser:
     q = pl.add_parser("show")
     q.add_argument("id")
     q.set_defaults(func=cmd_plan)
+    q = pl.add_parser("serve")
+    q.add_argument("id")
+    q.add_argument("--port", type=int, default=8788)
+    q.add_argument("--open", action="store_true")
+    q.set_defaults(func=cmd_plan)
     q = pl.add_parser("render")
     q.add_argument("id")
     q.set_defaults(func=cmd_plan)
@@ -1066,6 +1195,15 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("judge", help="decision base with citations")
     j = p.add_subparsers(dest="judge_cmd", required=True)
     q = j.add_parser("list")
+    q.set_defaults(func=cmd_judge)
+    q = j.add_parser("decide")
+    q.add_argument("query", nargs="+")
+    q.set_defaults(func=cmd_judge)
+    q = j.add_parser("eval")
+    q.add_argument("--cases")
+    q.set_defaults(func=cmd_judge)
+    q = j.add_parser("import")
+    q.add_argument("--file", required=True)
     q.set_defaults(func=cmd_judge)
     q = j.add_parser("add")
     q.add_argument("question")
@@ -1109,12 +1247,44 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_critique)
 
     p = sub.add_parser("verify", help="TLA+ lifecycle model + live invariants")
+    p.add_argument("id", nargs="?")
     p.set_defaults(func=cmd_verify)
 
     p = sub.add_parser("retro", help="weekly learning report")
     p.add_argument("--days", type=int, default=7)
     p.add_argument("--write", action="store_true")
     p.set_defaults(func=cmd_retro)
+
+    p = sub.add_parser("mutation", help="run mutation commands on a throwaway worktree")
+    p.add_argument("id")
+    p.set_defaults(func=cmd_mutation)
+
+    p = sub.add_parser("mirror", help="mirror tasks to GitHub issues")
+    mi = p.add_subparsers(dest="mirror_cmd", required=True)
+    q = mi.add_parser("github")
+    q.add_argument("--apply", action="store_true")
+    q.set_defaults(func=cmd_mirror)
+
+    p = sub.add_parser("usage", help="token/duration/cost usage")
+    u = p.add_subparsers(dest="usage_cmd", required=True)
+    q = u.add_parser("add")
+    q.add_argument("--task", required=True)
+    q.add_argument("--stage", required=True)
+    q.add_argument("--model", default="")
+    q.add_argument("--prompt-tokens", type=int, default=0)
+    q.add_argument("--completion-tokens", type=int, default=0)
+    q.add_argument("--duration-ms", type=int, default=0)
+    q.add_argument("--cost-usd", default="0")
+    q.set_defaults(func=cmd_usage)
+
+    p = sub.add_parser("learn", help="weekly learning proposals")
+    p.add_argument("--days", type=int, default=7)
+    p.set_defaults(func=cmd_learn)
+
+    p = sub.add_parser("feed", help="proactive JSONL inbox")
+    p.add_argument("--file", required=True)
+    p.add_argument("--no-planner", action="store_true")
+    p.set_defaults(func=cmd_feed)
 
     p = sub.add_parser("human", help="human authorization token")
     h = p.add_subparsers(dest="human_cmd", required=True)

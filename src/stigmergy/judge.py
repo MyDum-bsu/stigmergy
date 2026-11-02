@@ -99,11 +99,46 @@ def add(
     return parse_decision(path)
 
 
+
+
+def import_file(config: Config, path: Path) -> dict[str, Any]:
+    """Import decisions from JSONL; used by the nightly persona ingest."""
+    import json
+
+    count = 0
+    errors = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+            add(
+                config,
+                str(row["question"]),
+                str(row["decision"]),
+                quote=str(row.get("quote") or ""),
+                source=str(row.get("source") or ""),
+                date=str(row.get("date") or ""),
+                scope=str(row.get("scope") or "project"),
+            )
+            count += 1
+        except (KeyError, ValueError, OSError):
+            errors += 1
+    return {"imported": count, "errors": errors, "path": str(path)}
+
+
 def _tokens(text: str) -> set[str]:
     return {
         token
         for token in re.findall(r"[a-zа-яё0-9]{3,}", text.lower())
-        if token not in {"что", "как", "для", "или", "это", "все", "the", "and"}
+        if token
+        not in {
+            "что", "как", "для", "или", "это", "все", "the", "and",
+            "какой", "какие", "какая", "какое", "кто", "где", "когда",
+            "зачем", "почему", "можно", "нужно", "делать", "сделать",
+            "этот", "эта", "эти", "если", "чем", "чего", "такой",
+            "такая", "такие",
+        }
     }
 
 
@@ -132,6 +167,91 @@ def search(config: Config, query: str, *, limit: int = 5) -> list[dict[str, Any]
         for score, item in scored[: max(1, limit)]
     ]
 
+
+
+ALWAYS_HUMAN = re.compile(
+    r"деньг|оплат|платеж|платёж|доступ|парол|секрет|удал|уничтож|"
+    r"необратим|люд|сообщ|публик|рассылк|инвойс|касс",
+    re.IGNORECASE,
+)
+
+
+def decide(config: Config, question: str, *, threshold: float = 0.45) -> dict[str, Any]:
+    """Three outcomes: resolved with citations, wrong question, or new/human."""
+    question = question.strip()
+    if ALWAYS_HUMAN.search(question):
+        return {
+            "outcome": "human",
+            "decision": "",
+            "citations": [],
+            "score": 0.0,
+            "reason": "always-human category",
+        }
+    if not ("?" in question or " или " in question or " либо " in question or re.search(r"\d", question)):
+        return {
+            "outcome": "wrong",
+            "decision": "",
+            "citations": [],
+            "score": 0.0,
+            "reason": "question has no options, price or concrete choice",
+        }
+    items = search(config, question, limit=3)
+    if not items:
+        return {"outcome": "new", "decision": "", "citations": [], "score": 0.0, "reason": "not in decisions"}
+    top = items[0]
+    if top["score"] >= threshold and top.get("quote") and top.get("source") and top.get("date"):
+        return {
+            "outcome": "resolved",
+            "decision": top["decision"],
+            "citations": [top],
+            "score": top["score"],
+            "reason": "decision found with citation",
+        }
+    return {
+        "outcome": "new",
+        "decision": "",
+        "citations": items[:3],
+        "score": top["score"],
+        "reason": "match below threshold or missing citation/date",
+    }
+
+
+def evaluate(config: Config, cases_path: Path | None = None) -> dict[str, Any]:
+    import json
+
+    path = cases_path or (config.integration_root / "decisions" / "eval.jsonl")
+    if not path.exists():
+        path = config.root / "decisions" / "eval.jsonl"
+    if not path.exists():
+        return {"ok": False, "detail": f"eval cases missing: {path}", "total": 0}
+    rows = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            rows.append(json.loads(line))
+    correct = 0
+    always_total = always_correct = 0
+    details = []
+    for row in rows:
+        got = decide(config, str(row.get("question", "")))
+        expected = str(row.get("expected", ""))
+        good = got["outcome"] == expected
+        correct += int(good)
+        if expected == "human":
+            always_total += 1
+            always_correct += int(good)
+        details.append({"question": row.get("question"), "expected": expected, "got": got["outcome"], "ok": good})
+    total = len(rows)
+    accuracy = correct / total if total else 0.0
+    always = always_correct / always_total if always_total else 1.0
+    return {
+        "ok": total > 0 and accuracy >= 0.9 and always >= 1.0,
+        "total": total,
+        "correct": correct,
+        "accuracy": round(accuracy, 3),
+        "always_human_accuracy": round(always, 3),
+        "path": str(path),
+        "details": details,
+    }
 
 def answer_text(items: list[dict[str, Any]]) -> str:
     if not items:

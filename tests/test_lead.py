@@ -85,7 +85,7 @@ def test_start_lead_reuses_and_creates_tab(repo: Path, monkeypatch) -> None:
     monkeypatch.setattr(lead.herdr_app, "create_tab", fake_tab)
     data = lead.start_lead(config, board)
     assert data == {"space": "sp0", "tab": "tb0", "terminal": "t1", "created": True}
-    assert seen["space"] == "sp0"
+    assert seen["space"] == config.space
     assert seen["name"] == lead.LEAD_TAB
     assert seen["agent_args"] == ["--exclude-tools", "edit,write"]
     assert "lead.started" in [event["action"] for event in board.read()]

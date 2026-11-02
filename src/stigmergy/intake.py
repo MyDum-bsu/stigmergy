@@ -470,6 +470,7 @@ def approve_plan(
         },
         f"approve plan {task_id}",
     )
+    _close_task_tabs(config, task_id)
     return {
         "task": task_id,
         "spec": f"specs/{task_id}.md",
@@ -479,6 +480,14 @@ def approve_plan(
         "copied": copied,
         "event": event,
     }
+
+
+def _close_task_tabs(config: Config, task_id: str) -> None:
+    """Boundary: Herdr is external, so a close failure must not fail the approve."""
+    try:
+        herdr_app.close_task_tabs(str(config.runner.get("app", herdr_app.DEFAULT_APP)), task_id)
+    except herdr_app.HerdrAppError as exc:
+        print(f"herdr: tabs not closed: {exc}")
 
 
 def auto_approve_plan(config: Config, board: Board, task_id: str) -> dict[str, Any]:

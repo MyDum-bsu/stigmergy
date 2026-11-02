@@ -126,6 +126,7 @@ def start_episode(
     wait_runner: bool = True,
     space: str | None = None,
     tab_name: str | None = None,
+    tab_title: str | None = None,
 ) -> tuple[EpisodeResult, str]:
     state = state_of(board, config.name)
     task = state.task(task_id)
@@ -156,7 +157,6 @@ def start_episode(
         from stigmergy.runner.herdr_app import HerdrAppRunner
 
         space = space or str(config.runner.get("space", "") or "") or None
-        tab_name = tab_name or (f"{task.id} · {task.title}".strip(" ·") if task.title else task.id)
         agent_args = routing.args(config, "worker", ["--exclude-tools", "AskUserQuestion"])
         for skill in spec.skills:
             agent_args.extend(["--skill", skill])
@@ -177,6 +177,7 @@ def start_episode(
             timeout_s=int(config.runner.get("prompt_timeout_s", 1800)),
             space=space,
             tab_name=tab_name,
+            tab_title=tab_title or task.title,
             space_folder=config.root,
             agent_args=agent_args,
             argv=worker_argv,
@@ -317,7 +318,7 @@ def finish_episode(
     use_sandbox: bool | None = None,
 ) -> EpisodeResult:
     try:
-        return _finish_episode(
+        result = _finish_episode(
             config,
             board,
             task_id,
@@ -329,6 +330,18 @@ def finish_episode(
     finally:
         if not bool(config.runner.get("keep_workspace", True)):
             _close_runner_workspace(config, board, task_id)
+    _close_task_tabs(config, task_id)
+    return result
+
+
+def _close_task_tabs(config: Config, task_id: str) -> None:
+    """Boundary: Herdr is external, so a close failure must not fail the episode."""
+    from stigmergy.runner import herdr_app
+
+    try:
+        herdr_app.close_task_tabs(str(config.runner.get("app", herdr_app.DEFAULT_APP)), task_id)
+    except herdr_app.HerdrAppError as exc:
+        print(f"herdr: tabs not closed: {exc}")
 
 
 def _close_runner_workspace(config: Config, board: Board, task_id: str) -> None:
@@ -507,15 +520,6 @@ def _finish_episode(
     result.merged = True
     result.detail = f"merged into {config.base}"
     render(board.views_dir, state_of(board, config.name))
-    if str(config.runner.get("kind", "")) == "herdr-app":
-        try:
-            from stigmergy.runner import herdr_app
-
-            herdr_app.close_task_tabs(
-                str(config.runner.get("app", "herdr-app")), task.id
-            )
-        except Exception:
-            pass
     return result
 
 

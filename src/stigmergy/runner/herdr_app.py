@@ -6,10 +6,13 @@ adapter creates a visible space per task and drives the agent through `hc`.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import shutil
 import subprocess
 import time
+from collections.abc import Mapping
 from pathlib import Path
 
 from stigmergy.runner.base import RunnerHandle
@@ -17,6 +20,16 @@ from stigmergy.runner.base import RunnerHandle
 DEFAULT_APP = "herdr-app"
 DEFAULT_AGENT = "pi"
 PREFIX = "stg-"
+
+MAX_TAB_LABEL = 48
+PROTECTED_TAB_PREFIXES = ("Lead", "Board")
+TAB_KINDS = ("Plan", "Worker", "Critic")
+TERMINAL_STATUSES = ("done", "merged", "failed", "cancelled")
+LEAD_TAB_NAME = "Lead"
+TAB_SEPARATOR = " · "
+
+_MARKER = re.compile(r"\[([0-9a-f]+)\]$")
+_DATE_TOKEN = re.compile(r"t-\d{8}")
 
 
 class HerdrAppError(RuntimeError):
@@ -78,7 +91,22 @@ def spaces(app: str = DEFAULT_APP) -> list[dict]:
     return list(data.get("spaces") or [])
 
 
+def _space_ref(app: str, value: object) -> str:
+    """``tab.new`` addresses a space by id; callers may also pass the space name."""
+    text = str(value)
+    known = spaces(app)
+    for space in known:
+        if str(space.get("id", "")) == text:
+            return text
+    for space in known:
+        if str(space.get("name", "")) == text:
+            return str(space.get("id") or text)
+    return text
+
+
 def _do(app: str, command: str, **kwargs) -> dict:
+    if command == "tab.new" and kwargs.get("space"):
+        kwargs["space"] = _space_ref(app, kwargs["space"])
     argv = [binary(app), "do", command]
     for key, value in kwargs.items():
         if value is None:
@@ -214,23 +242,190 @@ def close_space(space_id: str) -> dict:
         return {"ok": False}
 
 
-def close_task_tabs(app: str = DEFAULT_APP, task_id: str = "") -> list[str]:
-    """Close the worker, planner and critic tabs of a finished task."""
+def short_id(task_id: str, length: int = 6) -> str:
+    """Stable short marker for a task id: same id, same marker, every run."""
+    return hashlib.sha256(task_id.encode("utf-8")).hexdigest()[:length]
+
+
+def _clean_title(title: str, task_id: str) -> str:
+    text = str(title or "")
+    if task_id:
+        text = text.replace(task_id, " ")
+    kept = [token for token in text.split() if not _DATE_TOKEN.search(token)]
+    return " ".join(" ".join(kept).split())
+
+
+def tab_label(kind: str, title: str, task_id: str, max_len: int = MAX_TAB_LABEL) -> str:
+    """Readable tab name: kind, human title, stable marker; marker always last."""
+    marker = f"[{short_id(task_id)}]"
+    head = f"{kind}{TAB_SEPARATOR}"
+    clean = _clean_title(title, task_id)
+    if not clean:
+        return f"{head}{marker}"
+    label = f"{head}{clean} {marker}"
+    if len(label) <= max_len:
+        return label
+    room = max_len - len(head) - len(marker) - 2
+    if room < 1:
+        return f"{head}{marker}"
+    return f"{head}{clean[:room]}… {marker}"
+
+
+def is_protected_tab(name: str) -> bool:
+    """Lead and Board tabs outlive every task."""
+    return name.startswith(PROTECTED_TAB_PREFIXES)
+
+
+def tab_marker(name: str) -> str | None:
+    """Trailing ``[xxxxxx]`` marker of a managed tab, if it carries one."""
+    match = _MARKER.search(str(name or ""))
+    return match.group(1) if match else None
+
+
+def managed_kind(name: str) -> str | None:
+    """Kind of a managed tab, or None when the name is not ours to close."""
+    value = str(name or "")
+    if not value or is_protected_tab(value):
+        return None
+    head, sep, _rest = value.partition(TAB_SEPARATOR)
+    if sep:
+        if head in TAB_KINDS:
+            return head
+        return "Worker"
+    if value.startswith(PREFIX):
+        return "Worker"
+    return None
+
+
+def _tab_terminals(tab: dict) -> list[str]:
+    terminals: list[str] = []
+    for item in tab.get("terminals") or []:
+        value = str(item.get("terminal") or item.get("id") or "") if isinstance(item, dict) else str(item)
+        if value:
+            terminals.append(value)
+    return terminals
+
+
+def _terminal_gone(terminal: str) -> bool:
+    try:
+        get(terminal)
+    except HerdrAppError:
+        return True
+    return False
+
+
+def _close_tab(app: str, tab: dict) -> None:
+    _do(app, "tab.close", id=str(tab.get("id", "")), confirmed="true")
+
+
+def ensure_lead_tab(
+    app: str = DEFAULT_APP,
+    space: str = "",
+    folder: Path | None = None,
+    agent: str = DEFAULT_AGENT,
+    task: str = "",
+    *,
+    agent_args: list[str] | None = None,
+    argv: list[str] | None = None,
+) -> dict:
+    """Exactly one Lead tab in the existing project space; never a second space."""
+    root = Path(folder) if folder is not None else Path.cwd()
+    if not space:
+        for candidate in spaces(app):
+            if str(candidate.get("folder", "")) == str(root):
+                space = str(candidate.get("name", ""))
+                break
+        if not space:
+            raise HerdrAppError(f"no herdr space for {root}")
+    project_space = ensure_space(app, space, root)
+    space_id = str(project_space.get("space") or project_space.get("id") or "")
+    if not space_id:
+        raise HerdrAppError(f"herdr space {space!r} has no id")
+    leads = [
+        tab for tab in (project_space.get("tabs") or []) if str(tab.get("name", "")) == LEAD_TAB_NAME
+    ]
+    if leads:
+        for duplicate in leads[1:]:
+            _close_tab(app, duplicate)
+        return {"created": False, "tab": leads[0]}
+    created = create_tab(
+        app,
+        space,
+        LEAD_TAB_NAME,
+        root,
+        agent,
+        task,
+        agent_args=agent_args,
+        argv=argv,
+    )
+    return {"created": True, "tab": created}
+
+
+def close_task_tabs(
+    app: str = DEFAULT_APP,
+    task_id: str = "",
+    title: str = "",
+    *,
+    dry_run: bool = False,
+) -> list[str]:
+    """Close the Plan, Worker and Critic tabs that belong to one task."""
     if not task_id:
         return []
-    closed: list[str] = []
+    marker = short_id(task_id)
+    legacy_names = {f"{kind}{TAB_SEPARATOR}{task_id}" for kind in TAB_KINDS}
     prefixes = (f"{task_id} ·", f"{PREFIX}{task_id}")
-    names = {f"Plan · {task_id}", f"Critic · {task_id}"}
+    closed: list[str] = []
     for space in spaces(app):
         for tab in space.get("tabs") or []:
             name = str(tab.get("name", ""))
-            if not (name in names or any(name.startswith(prefix) for prefix in prefixes)):
+            if is_protected_tab(name):
                 continue
-            try:
-                _do(app, "tab.close", id=str(tab.get("id", "")), confirmed="true")
-                closed.append(name)
-            except HerdrAppError:
+            if managed_kind(name) is None:
                 continue
+            if not (
+                tab_marker(name) == marker
+                or name in legacy_names
+                or name.startswith(prefixes)
+            ):
+                continue
+            if not dry_run:
+                _close_tab(app, tab)
+            closed.append(name)
+    return closed
+
+
+def cleanup_tabs(
+    app: str = DEFAULT_APP,
+    statuses: Mapping[str, str] | None = None,
+    *,
+    now: float | None = None,
+    stale_after_s: int = 6 * 3600,
+    dry_run: bool = False,
+) -> list[str]:
+    """Sweep managed tabs of finished tasks and of dead or stale orphans."""
+    known = {short_id(task_id): str(status) for task_id, status in (statuses or {}).items()}
+    moment = time.time() if now is None else now
+    closed: list[str] = []
+    for space in spaces(app):
+        for tab in space.get("tabs") or []:
+            name = str(tab.get("name", ""))
+            if is_protected_tab(name):
+                continue
+            if managed_kind(name) is None:
+                continue
+            marker = tab_marker(name)
+            if marker is not None and marker in known:
+                doomed = known[marker] in TERMINAL_STATUSES
+            else:
+                terminals = _tab_terminals(tab)
+                created_at = tab.get("created_at")
+                stale = created_at is not None and moment - float(created_at) >= stale_after_s
+                doomed = not terminals or all(_terminal_gone(item) for item in terminals) or stale
+            if not doomed:
+                continue
+            if not dry_run:
+                _close_tab(app, tab)
+            closed.append(name)
     return closed
 
 
@@ -307,12 +502,16 @@ class HerdrAppRunner:
         space_folder: Path | None = None,
         agent_args: list[str] | None = None,
         argv: list[str] | None = None,
+        tab_kind: str = "Worker",
+        tab_title: str = "",
     ):
         self.app = app
         self.agent = agent
         self.timeout_s = timeout_s
         self.space = space
         self.tab_name = tab_name
+        self.tab_kind = tab_kind
+        self.tab_title = tab_title
         self.space_folder = space_folder
         self.agent_args = list(agent_args or [])
         self.argv = list(argv or [])
@@ -326,7 +525,7 @@ class HerdrAppRunner:
             created = create_tab(
                 self.app,
                 space,
-                self.tab_name or task_id,
+                self.tab_name or tab_label(self.tab_kind, self.tab_title, task_id),
                 workspace,
                 self.agent,
                 prompt,

@@ -734,6 +734,12 @@ def cmd_worker(args: argparse.Namespace) -> int:
 
     data = board_mod.worker_done(board, config, args.id, args.agent)
     _emit(args, data, f"worker.done {args.id} agent={args.agent}")
+    from stigmergy.runner import herdr_app
+
+    try:
+        herdr_app.close_task_tabs(str(config.runner.get("app", herdr_app.DEFAULT_APP)), args.id)
+    except herdr_app.HerdrAppError as exc:
+        print(f"herdr: tabs not closed: {exc}")
     return 0
 
 
@@ -1080,8 +1086,17 @@ def cmd_app(args: argparse.Namespace) -> int:
         _emit(args, items, "\n".join(lines) or "no spaces")
         return 0
     if args.app_cmd == "cleanup":
-        closed = herdr_app.cleanup(args.app, args.task)
-        _emit(args, {"closed": closed}, "\n".join(closed) or "nothing to close")
+        _root, config, board = _ctx(args)
+        statuses = {task.id: task.status for task in _state(board, config).all()}
+        try:
+            if args.task:
+                names = herdr_app.close_task_tabs(args.app, args.task, dry_run=args.dry_run)
+            else:
+                names = herdr_app.cleanup_tabs(args.app, statuses, dry_run=args.dry_run)
+        except herdr_app.HerdrAppError as exc:
+            print(f"herdr: {exc}", file=sys.stderr)
+            return 1
+        _emit(args, {"closed": names, "dry_run": args.dry_run}, "\n".join(names) or "nothing to close")
         return 0
     raise RuntimeError(f"unknown app command: {args.app_cmd}")
 
@@ -1261,6 +1276,7 @@ def build_parser() -> argparse.ArgumentParser:
     q = ap.add_parser("cleanup")
     q.add_argument("--app", default="herdr-app")
     q.add_argument("--task", default=None)
+    q.add_argument("--dry-run", action="store_true")
     q.set_defaults(func=cmd_app)
 
     p = sub.add_parser("episode", help="episode lifecycle")

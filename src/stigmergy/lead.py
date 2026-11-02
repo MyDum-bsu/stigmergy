@@ -8,7 +8,7 @@ from stigmergy.log import Board, BoardError
 from stigmergy.model import ProjectState
 from stigmergy.runner import herdr_app
 
-LEAD_TAB = "Lead · architect"
+LEAD_TAB = "Lead"
 LEAD_AGENT_ARGS = ["--exclude-tools", "edit,write"]
 
 
@@ -81,8 +81,14 @@ def _tab_terminal(tab: dict | None) -> str:
     if not tab:
         return ""
     for terminal in tab.get("terminals") or []:
-        return str(terminal.get("terminal", ""))
-    return ""
+        if isinstance(terminal, dict):
+            return str(terminal.get("terminal", ""))
+        return str(terminal)
+    return str(tab.get("terminal", ""))
+
+
+def _tab_id(tab: dict) -> str:
+    return str(tab.get("tab") or tab.get("id") or "")
 
 
 def start_lead(
@@ -100,14 +106,15 @@ def start_lead(
     space_id = _space_id(project_space)
     if not space_id:
         raise BoardError(f"space {space_name!r} not found/created")
-    tab = _find_tab(project_space, tab_name)
-    if tab is not None and not force:
-        return {
-            "space": space_id,
-            "tab": str(tab.get("id", "")),
-            "terminal": _tab_terminal(tab),
-            "created": False,
-        }
+    if not force and tab_name != LEAD_TAB:
+        tab = _find_tab(project_space, tab_name)
+        if tab is not None:
+            return {
+                "space": space_id,
+                "tab": _tab_id(tab),
+                "terminal": _tab_terminal(tab),
+                "created": False,
+            }
     argv = None
     from stigmergy import routing, sandbox
 
@@ -118,16 +125,37 @@ def start_lead(
             str(config.runner.get("agent", "pi")),
             lead_args,
         )
-    created = herdr_app.create_tab(
-        app,
-        space_id,
-        tab_name,
-        config.root,
-        "pi",
-        lead_prompt(config, space_name),
-        agent_args=lead_args,
-        argv=argv,
-    )
+    prompt = lead_prompt(config, space_name)
+    if not force and tab_name == LEAD_TAB:
+        outcome = herdr_app.ensure_lead_tab(
+            app=app,
+            space=space_name,
+            folder=config.root,
+            agent=str(config.runner.get("agent", "pi")),
+            task=prompt,
+            agent_args=lead_args,
+            argv=argv,
+        )
+        if not outcome["created"]:
+            found = outcome["tab"]
+            return {
+                "space": space_id,
+                "tab": _tab_id(found),
+                "terminal": _tab_terminal(found),
+                "created": False,
+            }
+        created = outcome["tab"]
+    else:
+        created = herdr_app.create_tab(
+            app,
+            space_id,
+            tab_name,
+            config.root,
+            "pi",
+            prompt,
+            agent_args=lead_args,
+            argv=argv,
+        )
     terminal = str(created.get("terminal", ""))
     board.append(
         "lead.started",
@@ -135,14 +163,14 @@ def start_lead(
         {
             "project.name": config.name,
             "lead.space": space_id,
-            "lead.tab": str(created.get("tab", "")),
+            "lead.tab": _tab_id(created),
             "lead.handle": terminal,
         },
         "lead started",
     )
     return {
         "space": space_id,
-        "tab": str(created.get("tab", "")),
+        "tab": _tab_id(created),
         "terminal": terminal,
         "created": True,
     }

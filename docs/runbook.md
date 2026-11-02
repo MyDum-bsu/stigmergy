@@ -182,7 +182,29 @@ stg promote --apply            # только человек, только fast-
 non-fast-forward или `main`, занятом в другом worktree. `main` не трогается
 фабрикой автоматически.
 
-## 12. Диагностика
+## 12. Внешние адаптеры
+
+```toml
+[notify]
+telegram_token_env = "STG_TELEGRAM_TOKEN"
+telegram_chat_id = ""
+webhook_url = ""
+
+[visual]
+command = "my-visual-acceptance --target {target}"  # получает STG_VISUAL_TARGET
+```
+
+```bash
+stg notify --text "gate failed"          # dry-run, без сети
+stg notify --text "gate failed" --send   # человек; реальный Telegram/webhook
+stg visual check --target http://127.0.0.1:3000
+stg visual check --target http://127.0.0.1:3000 --run  # человек
+```
+
+Токен Telegram берётся из env, не из репозитория. `mirror github --apply`
+также требует human token; без него — только dry-run payloads.
+
+## 13. Диагностика
 
 | Симптом | Что проверить |
 |---|---|
@@ -194,7 +216,7 @@ non-fast-forward или `main`, занятом в другом worktree. `main` 
 | `GoUsageLimitError` | квота провайдера; эпизод падает, не мержится |
 | `database is locked` (board) | второй писатель; `flock` ждёт, проверь долгий процесс |
 
-## 13. Безопасность
+## 14. Безопасность
 
 - `main` не пишется фабрикой; мерж только в `base` (`dev`), fast-forward.
 - `data/`, `tracker/data/`, `$HOME`, SSH и креды не видны в episode/gate.

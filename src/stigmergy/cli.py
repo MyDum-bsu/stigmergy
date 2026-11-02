@@ -492,9 +492,10 @@ def cmd_mutation(args: argparse.Namespace) -> int:
 
 def cmd_mirror(args: argparse.Namespace) -> int:
     _root, config, board = _ctx(args)
-    from stigmergy import mirror
+    from stigmergy import human, mirror
 
     if args.apply:
+        human.require()
         data = mirror.apply(config, board)
     else:
         items = mirror.payloads(config, board)
@@ -618,6 +619,28 @@ def cmd_promote(args: argparse.Namespace) -> int:
         data = promote.status(config)
     _emit(args, data, json.dumps(data, ensure_ascii=False, indent=2))
     return 0 if data.get("ok") and (data.get("applied", True)) else 1
+
+
+def cmd_notify(args: argparse.Namespace) -> int:
+    _root, config, _board = _ctx(args)
+    from stigmergy import human, notify
+
+    if args.send:
+        human.require()
+    data = notify.send(config, args.text, send_now=args.send)
+    _emit(args, data, json.dumps(data, ensure_ascii=False, indent=2))
+    return 0 if data["ok"] else 1
+
+
+def cmd_visual(args: argparse.Namespace) -> int:
+    _root, config, _board = _ctx(args)
+    from stigmergy import human, visual
+
+    if args.run:
+        human.require()
+    data = visual.check(config, args.target, run_now=args.run, timeout=args.timeout)
+    _emit(args, data, json.dumps(data, ensure_ascii=False, indent=2))
+    return 0 if data["ok"] else 1
 
 
 def cmd_feed(args: argparse.Namespace) -> int:
@@ -1408,6 +1431,19 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("promote", help="dry-run/apply dev → protected main")
     p.add_argument("--apply", action="store_true")
     p.set_defaults(func=cmd_promote)
+
+    p = sub.add_parser("notify", help="Telegram/webhook notification")
+    p.add_argument("--text", required=True)
+    p.add_argument("--send", action="store_true")
+    p.set_defaults(func=cmd_notify)
+
+    p = sub.add_parser("visual", help="visual/computer acceptance adapter")
+    v = p.add_subparsers(dest="visual_cmd", required=True)
+    q = v.add_parser("check")
+    q.add_argument("--target", required=True)
+    q.add_argument("--run", action="store_true")
+    q.add_argument("--timeout", type=int, default=None)
+    q.set_defaults(func=cmd_visual)
 
     p = sub.add_parser("feed", help="proactive JSONL inbox")
     p.add_argument("--file", required=True)

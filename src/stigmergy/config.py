@@ -37,6 +37,12 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "judge": "",
         "bench_command": "",
     },
+    "notify": {
+        "telegram_token_env": "STG_TELEGRAM_TOKEN",
+        "telegram_chat_id": "",
+        "webhook_url": "",
+    },
+    "visual": {"command": "", "timeout_seconds": 120},
 }
 
 
@@ -141,6 +147,14 @@ planner = ""
 critic = ""
 lead = ""
 bench_command = ""
+
+[notify]
+telegram_token_env = "STG_TELEGRAM_TOKEN"
+telegram_chat_id = ""
+webhook_url = ""
+
+[visual]
+command = ""
 
 [risk]
 low = "auto"

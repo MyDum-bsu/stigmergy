@@ -41,6 +41,8 @@ stg model route --stage worker
 stg model bench --cases evals/cases.jsonl --model <model>
 stg pbt <ID>                             # property seeds + live-model probe
 stg promote                              # dry-run dev → main (human --apply)
+stg notify --text "gate failed"          # dry-run; --send is human-only
+stg visual check --target http://...     # dry-run; --run is human-only
 stg feed --file .factory/inbox.jsonl
 stg mutation <ID>
 stg mirror github
@@ -75,7 +77,7 @@ installed as user systemd timers on this machine.
 
 Проверено в этом окружении:
 
-- `uv run pytest -q` — 106 passed; `uv run ruff check .` — clean.
+- `uv run pytest -q` — 109 passed; `uv run ruff check .` — clean.
 - T5 end-to-end на клоне `optimization`: `stg run T5-land --runner noop --auto
   --no-sandbox` → `gate.passed`, `control.proven`, `integration.passed`,
   `merge.done`; `dev` fast-forward на `a9f57f6`, `.beads` не в дереве,
@@ -83,22 +85,29 @@ installed as user systemd timers on this machine.
 - High-risk live fixture: `formal` core/task PASS, mutant rejected, critic
   report clean, properties 3/3 seeds, live-model PASS, negative control
   proven; задача остановлена на `task.blocked` «High-risk merge HR».
+- Real PBT on `optimization`: `mo_grader.scoring.compute` — 50 seeds × 500
+  cases, 25 000 проверок инвариантов балла (`0 ≤ score ≤ weight`,
+  `Σ tasks == total`, `total ≤ hw_max`).
 - `stg sandbox check` — bwrap-канарейка `ok`.
 - Herdr: systemd-сессия `factory` запущена; `pi` с ключом OpenCode Go 3
   (`opencode-go-chat-3`) прошёл реальные эпизоды `S8a` (конфиг + скилл) и
   `S8b2` (AGENTS.md на `stg`); `S8b` — пример плохого критерия: агент
   заблокировался, гейт покраснел, DoD исправлен в `S8b2`. Workspace эпизода
   остаётся открытым (`stg herdr list`, `herdr --session factory`).
-- Реальные мержи в `dev`: T5 `a8b2cd1`, S8a `892e241`, S8b2 `00e46b5`;
-  `main` не тронут (`069c3af`).
+- `optimization/main` fast-forward до `59f6f67` (22 коммита): factory docs/
+  specs/decisions, дедлайны hw10–19, tracker UI fix; `make test` — 809
+  passed, 1 skipped, `make lint` — clean.
+- `stg notify` / `stg visual` — dry-run adapters; real `--send`/`--run` требуют
+  human token. GitHub mirror `--apply` — human token, реального создания
+  issues не было.
 - `stg migrate --check /home/mydum/src/optimization/.agent` — 292 события,
   105 задач, схема валидна.
 - timers: `stigmergy-learn.timer` → Mon 09:00, `stigmergy-persona.timer` →
   03:30 daily; both `active`.
 
-Не проверено: Telegram/cloud/computer-use adapters, real GitHub issue apply,
-PBT corpus на реальном коде `optimization` (harness и live fixture проверены),
-и promotion `main` — ждут явного go-ahead владельца.
+Внешние действия (Telegram/cloud, visual `--run`, GitHub issue apply) в этом
+прогоне не выполнялись — только dry-run adapters; для них нужен явный
+go-ahead владельца.
 
 ## Быстрый старт
 

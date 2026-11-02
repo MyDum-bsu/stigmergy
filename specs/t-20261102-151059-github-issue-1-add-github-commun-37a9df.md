@@ -7,11 +7,11 @@ deps: []
 allowed_paths:
   - AGENTS.md
 oracle_paths:
-  - tests/test_agents_md_github_section.py
+  - oracle/t-20261102-151059-github-issue-1-add-github-commun-37a9df/test_agents_md_github_section.py
 gate_inputs: []
 skills:
   - ~/.agents/skills/matt-writing-for-agents/SKILL.md
-dod: "uv run pytest -q tests/test_agents_md_github_section.py"
+dod: "python3 -m pytest -q oracle/t-20261102-151059-github-issue-1-add-github-commun-37a9df/test_agents_md_github_section.py"
 negative_control:
   corpus: oracle/negative/t-20261102-151059-github-issue-1-add-github-commun-37a9df/
 ---

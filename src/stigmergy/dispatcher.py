@@ -18,7 +18,6 @@ from typing import Any
 
 from stigmergy.config import Config
 from stigmergy.episode import start_episode, state_of
-from stigmergy.lead import runner_handle
 from stigmergy.log import Board
 from stigmergy.model import ACTIVE_STATIONS
 from stigmergy.runner import herdr_app
@@ -104,15 +103,23 @@ def _finish(config: Config, task_id: str) -> dict[str, Any]:
     }
 
 
-def _worker_ready(handle: str) -> tuple[bool, str]:
-    try:
-        data = herdr_app.get(handle)
-    except Exception as exc:
-        return False, str(exc)[:300]
-    status = data.get("status") or {}
-    state = str(status.get("state") or "")
-    turn = int(data.get("turn") or 0)
-    return state in {"idle", "done"} and turn > 0, f"{state}/turn={turn}"
+
+def worker_done_seq(board: Board, task_id: str) -> int:
+    """Latest worker.done after the latest episode.start/answer, else 0."""
+    start = answer = done = 0
+    for event in board.read():
+        attrs = event.get("attributes") or {}
+        if attrs.get("task.id") != task_id:
+            continue
+        seq = int(event.get("seq", 0))
+        action = event.get("action")
+        if action == "episode.started":
+            start = max(start, seq)
+        elif action == "task.answered":
+            answer = max(answer, seq)
+        elif action == "worker.done":
+            done = max(done, seq)
+    return done if done > max(start, answer) else 0
 
 
 def tick(
@@ -135,6 +142,7 @@ def tick(
     finish_fn = finish or _finish
     memory = state if state is not None else load_state(config)
     notified: dict[str, int] = dict(memory.get("notified") or {})
+    finishing: dict[str, int] = dict(memory.get("finishing") or {})
     actions: list[dict[str, Any]] = []
 
     app_status = herdr_app.status(app)
@@ -164,16 +172,35 @@ def tick(
         if result.get("sent"):
             notified[task.id] = task.last_seq
 
+    for task in snapshot.all():
+        if task.status != "queued" or task.retries < max_retries or not task.retries:
+            continue
+        if notified.get(task.id) == task.last_seq:
+            continue
+        message = (
+            f"Task {task.id} exhausted retries ({task.retries}); gate/manual review needed.\n"
+            f"  stg board show {task.id}"
+        )
+        result = notify_lead(board, task.id, message, hc=hc)
+        actions.append({"action": "notify_exhausted", **result})
+        if result.get("sent"):
+            notified[task.id] = task.last_seq
+
     for task in active:
         if task.status != "episode" or not auto_finish:
             continue
-        handle = runner_handle(board, task.id)
-        if not handle:
+        marker = worker_done_seq(board, task.id)
+        if not marker or finishing.get(task.id) == marker:
             continue
-        ready, detail = _worker_ready(handle)
-        if not ready:
-            continue
-        actions.append({"action": "finish", "task": task.id, "detail": detail, **finish_fn(config, task.id)})
+        finishing[task.id] = marker
+        actions.append(
+            {
+                "action": "finish",
+                "task": task.id,
+                "detail": f"worker.done seq={marker}",
+                **finish_fn(config, task.id),
+            }
+        )
 
     if len(busy) < max(1, config.wip):
         ready = [
@@ -206,6 +233,7 @@ def tick(
                 actions.append({"action": "start_failed", "task": task.id, "detail": str(exc)[:500]})
 
     memory["notified"] = notified
+    memory["finishing"] = finishing
     memory["last_tick"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     save_state(config, memory)
     return {

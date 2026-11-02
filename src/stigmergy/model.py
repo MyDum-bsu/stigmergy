@@ -47,6 +47,8 @@ class Task:
     evidence: str = ""
     commit: str = ""
     tree: str = ""
+    episode_open: bool = False
+    runner_handle: str = ""
     retries: int = 0
     created_seq: int = 0
     last_seq: int = 0
@@ -77,6 +79,8 @@ class Task:
             "evidence": self.evidence,
             "commit": self.commit,
             "tree": self.tree,
+            "episode_open": self.episode_open,
+            "runner_handle": self.runner_handle,
             "retries": self.retries,
             "sha": self.sha,
             "question": self.question,
@@ -160,6 +164,8 @@ class ProjectState:
             task.answer = attrs.get("answer", "")
         elif action == "task.claimed":
             task.status = CLAIMED
+            task.episode_open = False
+            task.runner_handle = ""
             task.agent = attrs.get("agent.name", task.agent)
             task.lease_until = int(attrs.get("lease.until", task.lease_until))
             task.branch = attrs.get("vcs.branch", task.branch)
@@ -179,12 +185,16 @@ class ProjectState:
         elif action == "episode.started":
             task.status = EPISODE
             task.agent = attrs.get("agent.name", task.agent)
+            task.episode_open = True
+            task.runner_handle = attrs.get("runner.handle", task.runner_handle)
         elif action == "episode.finished":
             task.status = EPISODE
+            task.episode_open = False
             task.commit = attrs.get("vcs.commit", task.commit)
             task.tree = attrs.get("vcs.tree", task.tree)
         elif action == "episode.failed":
             task.status = FAILED
+            task.episode_open = False
             task.evidence = attrs.get("evidence", task.evidence)
         elif action == "gate.passed":
             task.status = GATED
@@ -227,6 +237,8 @@ class ProjectState:
             task.answer = attrs.get("answer", task.answer)
             if task.commit and task.tree:
                 task.status = INTEGRATED
+            elif task.episode_open:
+                task.status = EPISODE
             else:
                 task.status = QUEUED
         elif action == "task.requeued":

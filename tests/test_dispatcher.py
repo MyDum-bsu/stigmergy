@@ -76,8 +76,12 @@ def test_tick_finishes_settled_worker(repo: Path, monkeypatch) -> None:
         {"kind": "agent", "name": "pi"},
         {"project.name": "fixture", "task.id": "T1", "runner.handle": "t1"},
     )
+    board.append(
+        "worker.done",
+        {"kind": "agent", "name": "pi"},
+        {"project.name": "fixture", "task.id": "T1"},
+    )
     monkeypatch.setattr(dispatcher.herdr_app, "status", lambda app: {"ok": True})
-    monkeypatch.setattr(dispatcher, "_worker_ready", lambda handle: (True, "idle/turn=1"))
     seen = []
 
     def fake_finish(config, task_id):

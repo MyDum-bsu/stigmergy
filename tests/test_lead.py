@@ -65,7 +65,7 @@ def test_inbox_and_answer_resume_worker(repo: Path, monkeypatch) -> None:
     data = lead.answer(config, board, "T1", "use dev")
     assert data["sent"] is True
     assert calls[0] == ("send", "t1", "Лид: use dev\n\nПродолжай работу по спеке.")
-    assert _state(board).task("T1").status == "queued"
+    assert _state(board).task("T1").status == "episode"
 
 
 def test_start_lead_reuses_and_creates_tab(repo: Path, monkeypatch) -> None:

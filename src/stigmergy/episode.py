@@ -67,7 +67,15 @@ def new_episode_id() -> str:
     return f"ep_{time.strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:6]}"
 
 
-def build_prompt(task: Task, spec: Spec, workspace: Path, agent: str = "stg") -> str:
+def build_prompt(
+    task: Task,
+    spec: Spec,
+    workspace: Path,
+    agent: str = "stg",
+    board_root: Path | None = None,
+) -> str:
+    board = str(board_root or workspace)
+
     oracle = ", ".join(spec.oracle_paths) if spec.oracle_paths else "none"
     allowed = ", ".join(task.allowed_paths or spec.allowed_paths) or "see spec"
     return f"""You are the implementer for stigmergy task {task.id}.
@@ -84,10 +92,13 @@ Rules:
 - Work only inside the workspace. Do not touch oracle paths.
 - Do not merge or move branches. The contour commits the tree and runs the gate.
 - If you are blocked on a decision, run exactly:
-  `stg board block {task.id} --agent {agent} --question "<one question>"`
+  `stg --board {board} board block {task.id} --agent {agent} --question "<one question>"`
   and stop. Do not use AskUserQuestion and do not ask the human: the lead
   answers through `stg lead answer` and resumes you.
-- When the work is done, stop. The gate decides whether it is done.
+- When the work is done, run exactly:
+  `stg --board {board} worker done {task.id} --agent {agent}`
+  then stop. Idle is not proof; the dispatcher waits for this marker. The
+  gate decides whether it is done.
 """
 
 
@@ -137,7 +148,9 @@ def start_episode(
             {"workspace.path": str(wt.path), "vcs.branch": wt.branch, "vcs.base": wt.base},
         )
     episode = new_episode_id()
-    prompt = build_prompt(task, load_for(config.root, wt.base, task.spec), wt.path, agent=agent)
+    prompt = build_prompt(
+        task, load_for(config.root, wt.base, task.spec), wt.path, agent=agent, board_root=config.root
+    )
     handle = None
     if runner == "herdr-app":
         from stigmergy.runner.herdr_app import HerdrAppRunner

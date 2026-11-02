@@ -267,6 +267,16 @@ def block(board: Board, config: Config, task_id: str, agent: str, question: str)
     )
 
 
+def worker_done(board: Board, config: Config, task_id: str, agent: str) -> dict:
+    """Explicit completion signal; idle is not proof."""
+    return board.append(
+        "worker.done",
+        _actor(agent),
+        _attrs(config.name, task_id, {"agent.name": agent}),
+        f"worker done {task_id}",
+    )
+
+
 def answer(board: Board, config: Config, task_id: str, by: str, text: str) -> dict:
     if by not in {"human", "lead"}:
         raise BoardError("answer is human-only or lead-only: pass --by human|lead")

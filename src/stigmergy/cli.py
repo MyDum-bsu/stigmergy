@@ -419,6 +419,15 @@ def cmd_merge(args: argparse.Namespace) -> int:
 
 
 # ── dash / status / doctor ─────────────────────────────────────────────────
+def cmd_worker(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from stigmergy import board as board_mod
+
+    data = board_mod.worker_done(board, config, args.id, args.agent)
+    _emit(args, data, f"worker.done {args.id} agent={args.agent}")
+    return 0
+
+
 def cmd_task(args: argparse.Namespace) -> int:
     _root, config, board = _ctx(args)
     from stigmergy import intake
@@ -914,6 +923,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("--agent", default="stg")
     p.set_defaults(func=cmd_merge)
+
+    p = sub.add_parser("worker", help="worker completion signal")
+    w = p.add_subparsers(dest="worker_cmd", required=True)
+    q = w.add_parser("done")
+    q.add_argument("id")
+    q.add_argument("--agent", default="pi")
+    q.set_defaults(func=cmd_worker)
 
     p = sub.add_parser("task", help="intake: raw idea -> planner")
     p.add_argument("idea", nargs="+")

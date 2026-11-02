@@ -89,3 +89,10 @@ def test_start_lead_reuses_and_creates_tab(repo: Path, monkeypatch) -> None:
     assert seen["name"] == lead.LEAD_TAB
     assert seen["agent_args"] == ["--exclude-tools", "edit,write"]
     assert "lead.started" in [event["action"] for event in board.read()]
+
+
+def test_lead_startup_does_not_scan_board(repo: Path) -> None:
+    config = Config.load(repo)
+    text = lead.lead_prompt(config, "fixture")
+    assert "Startup rule: do nothing" in text
+    assert "Do not scan the board" in text

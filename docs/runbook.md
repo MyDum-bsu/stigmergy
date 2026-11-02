@@ -171,7 +171,18 @@ stg schedule status
 `source`, `date`). Повторный ingest идемпотентен; digest —
 `persona/<date>.md`.
 
-## 11. Диагностика
+## 11. Promotion в main
+
+```bash
+stg promote                    # dry-run: fast-forward, dev_ahead, dirty
+stg promote --apply            # только человек, только fast-forward
+```
+
+`--apply` требует human token и отказывается при грязном дереве,
+non-fast-forward или `main`, занятом в другом worktree. `main` не трогается
+фабрикой автоматически.
+
+## 12. Диагностика
 
 | Симптом | Что проверить |
 |---|---|
@@ -183,7 +194,7 @@ stg schedule status
 | `GoUsageLimitError` | квота провайдера; эпизод падает, не мержится |
 | `database is locked` (board) | второй писатель; `flock` ждёт, проверь долгий процесс |
 
-## 12. Безопасность
+## 13. Безопасность
 
 - `main` не пишется фабрикой; мерж только в `base` (`dev`), fast-forward.
 - `data/`, `tracker/data/`, `$HOME`, SSH и креды не видны в episode/gate.

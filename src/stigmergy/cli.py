@@ -607,6 +607,19 @@ def cmd_pbt(args: argparse.Namespace) -> int:
     return 0 if data["ok"] and not data.get("skipped") else 1
 
 
+def cmd_promote(args: argparse.Namespace) -> int:
+    _root, config, _board = _ctx(args)
+    from stigmergy import human, promote
+
+    if args.apply:
+        human.require()
+        data = promote.apply(config)
+    else:
+        data = promote.status(config)
+    _emit(args, data, json.dumps(data, ensure_ascii=False, indent=2))
+    return 0 if data.get("ok") and (data.get("applied", True)) else 1
+
+
 def cmd_feed(args: argparse.Namespace) -> int:
     _root, config, board = _ctx(args)
     from pathlib import Path
@@ -1391,6 +1404,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("--no-sandbox", action="store_true")
     p.set_defaults(func=cmd_pbt)
+
+    p = sub.add_parser("promote", help="dry-run/apply dev → protected main")
+    p.add_argument("--apply", action="store_true")
+    p.set_defaults(func=cmd_promote)
 
     p = sub.add_parser("feed", help="proactive JSONL inbox")
     p.add_argument("--file", required=True)

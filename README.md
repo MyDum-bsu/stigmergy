@@ -40,6 +40,7 @@ stg model list                           # stage → model routing
 stg model route --stage worker
 stg model bench --cases evals/cases.jsonl --model <model>
 stg pbt <ID>                             # property seeds + live-model probe
+stg promote                              # dry-run dev → main (human --apply)
 stg feed --file .factory/inbox.jsonl
 stg mutation <ID>
 stg mirror github
@@ -74,7 +75,7 @@ installed as user systemd timers on this machine.
 
 Проверено в этом окружении:
 
-- `uv run pytest -q` — 104 passed; `uv run ruff check .` — clean.
+- `uv run pytest -q` — 106 passed; `uv run ruff check .` — clean.
 - T5 end-to-end на клоне `optimization`: `stg run T5-land --runner noop --auto
   --no-sandbox` → `gate.passed`, `control.proven`, `integration.passed`,
   `merge.done`; `dev` fast-forward на `a9f57f6`, `.beads` не в дереве,

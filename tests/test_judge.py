@@ -58,3 +58,7 @@ def test_add_decision_roundtrip(repo: Path) -> None:
     assert Path(item["path"]).exists()
     found = judge.search(config, "пушить main")
     assert found and found[0]["decision"] == "Только человек, фабрика не пишет main"
+
+
+def test_source_is_not_a_decision(repo: Path) -> None:
+    assert judge.decisions(Config.load(repo)) == []

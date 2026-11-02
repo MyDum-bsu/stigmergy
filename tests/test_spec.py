@@ -48,3 +48,11 @@ def test_missing_frontmatter() -> None:
         pass
     else:
         raise AssertionError("expected SpecError")
+
+
+def test_high_risk_needs_invariants() -> None:
+    high = SPEC_T1.replace("risk: medium", "risk: high")
+    errors = Spec.from_text(high, "specs/T1.md").validate()
+    assert any("invariants" in error for error in errors)
+    with_inv = high.replace("deps: []", "invariants:\n  - one sale, one receipt\ndeps: []")
+    assert not any("invariants" in error for error in Spec.from_text(with_inv, "specs/T1.md").validate())

@@ -165,6 +165,11 @@ class Spec:
         return [str(x) for x in (self.meta.get("oracle_paths") or [])]
 
     @property
+    def invariants(self) -> list[str]:
+        raw = self.meta.get("invariants") or []
+        return [str(item) for item in raw] if isinstance(raw, list) else []
+
+    @property
     def gate_inputs(self) -> list[str]:
         return [str(x) for x in (self.meta.get("gate_inputs") or [])]
 
@@ -209,6 +214,8 @@ class Spec:
             errors.append("dod must be a single line")
         if self.risk in {"medium", "high"} and not self.negative_corpus:
             errors.append("negative_control.corpus is required for medium/high risk")
+        if self.risk == "high" and not self.invariants:
+            errors.append("invariants are required for high risk (formal invariants before code)")
         return errors
 
     def validate_against_repo(self, repo: str | Path, base: str) -> list[str]:

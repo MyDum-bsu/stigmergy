@@ -183,6 +183,12 @@ def cmd_board(args: argparse.Namespace) -> int:
         )
         _emit(args, events, text)
         return 0
+    if cmd == "audit":
+        from stigmergy import metrics
+
+        data = metrics.anonymous(board.read())
+        _emit(args, data, "\n".join(f"{e['seq']}\t{e['action']}" for e in data) or "no anonymous events")
+        return 0
     if cmd == "status":
         data = board_mod.status(state)
         counts = ", ".join(f"{k}={v}" for k, v in data["status"].items())
@@ -419,6 +425,37 @@ def cmd_merge(args: argparse.Namespace) -> int:
 
 
 # ── dash / status / doctor ─────────────────────────────────────────────────
+def cmd_critique(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from stigmergy import critic
+
+    data = critic.start_critic(config, board, args.id, app=args.app)
+    _emit(args, data, f"critic {data['task']} terminal={data['terminal']} model={data['model']}")
+    return 0
+
+
+def cmd_retro(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from stigmergy import retro
+
+    data = retro.collect(config, board, days=args.days)
+    if args.write:
+        path = retro.write(config, board, days=args.days)
+        _emit(args, {"path": str(path), **data}, f"{path}\n\n{retro.render(data)}")
+    else:
+        _emit(args, data, retro.render(data))
+    return 0
+
+
+def cmd_metrics(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from stigmergy import metrics
+
+    data = metrics.snapshot(config, board)
+    _emit(args, data, metrics.text(data))
+    return 0
+
+
 def cmd_worker(args: argparse.Namespace) -> int:
     _root, config, board = _ctx(args)
     from stigmergy import board as board_mod
@@ -440,6 +477,8 @@ def cmd_task(args: argparse.Namespace) -> int:
         priority=args.priority,
         app=args.app,
         start_planner=not args.no_planner,
+        source=args.source,
+        source_id=args.source_id or "",
     )
     planner = data.get("planner") or {}
     text = (
@@ -475,6 +514,10 @@ def cmd_plan(args: argparse.Namespace) -> int:
             text.append(data.get(key) or "(empty)")
         _emit(args, data, "\n".join(text))
         return 0
+    if args.plan_cmd == "render":
+        path = intake.render_plan(config, args.id)
+        _emit(args, {"path": str(path)}, str(path))
+        return 0
     if args.plan_cmd == "approve":
         data = intake.approve_plan(config, board, args.id, agent=args.agent)
         _emit(args, data, f"approved {data['task']} spec={data['spec_sha']}")
@@ -486,6 +529,31 @@ def cmd_dispatcher(args: argparse.Namespace) -> int:
     _root, config, board = _ctx(args)
     from stigmergy import dispatcher
 
+    if args.all:
+        if args.watch:
+            raise BoardError("--all is one-shot; run one service per project")
+        from stigmergy.config import Config
+        from stigmergy.log import Board
+        from stigmergy.registry import load as registry_load
+
+        results = []
+        for item in registry_load():
+            root = Path(item["root"])
+            project_config = Config.load(root)
+            project_board = Board(root)
+            results.append(
+                {
+                    "project": project_config.name,
+                    **dispatcher.tick(
+                        project_config,
+                        project_board,
+                        app=args.app,
+                        auto_finish=not args.no_auto_finish,
+                    ),
+                }
+            )
+        _emit(args, results, json.dumps(results, ensure_ascii=False))
+        return 0
     if args.watch:
         def show(result: dict) -> None:
             print(json.dumps(result, ensure_ascii=False), flush=True)
@@ -842,6 +910,8 @@ def build_parser() -> argparse.ArgumentParser:
     q.set_defaults(func=cmd_board)
     q = b.add_parser("status")
     q.set_defaults(func=cmd_board)
+    q = b.add_parser("audit")
+    q.set_defaults(func=cmd_board)
     q = b.add_parser("render")
     q.set_defaults(func=cmd_board)
 
@@ -937,6 +1007,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--priority", type=int, default=2)
     p.add_argument("--app", default="herdr-app")
     p.add_argument("--no-planner", action="store_true")
+    p.add_argument("--source", default="human")
+    p.add_argument("--source-id", default="")
     p.set_defaults(func=cmd_task)
 
     p = sub.add_parser("plan", help="planner drafts and approval")
@@ -944,6 +1016,9 @@ def build_parser() -> argparse.ArgumentParser:
     q = pl.add_parser("list")
     q.set_defaults(func=cmd_plan)
     q = pl.add_parser("show")
+    q.add_argument("id")
+    q.set_defaults(func=cmd_plan)
+    q = pl.add_parser("render")
     q.add_argument("id")
     q.set_defaults(func=cmd_plan)
     q = pl.add_parser("approve")
@@ -954,6 +1029,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("dispatcher", help="event-driven factory loop")
     p.add_argument("--once", action="store_true")
     p.add_argument("--watch", action="store_true")
+    p.add_argument("--all", action="store_true")
     p.add_argument("--interval", type=int)
     p.add_argument("--app", default="herdr-app")
     p.add_argument("--no-auto-finish", action="store_true")
@@ -998,6 +1074,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--open", action="store_true")
     p.set_defaults(func=cmd_dash)
+
+    p = sub.add_parser("critique", help="open an independent critic tab")
+    p.add_argument("id")
+    p.add_argument("--app", default="herdr-app")
+    p.set_defaults(func=cmd_critique)
+
+    p = sub.add_parser("retro", help="weekly learning report")
+    p.add_argument("--days", type=int, default=7)
+    p.add_argument("--write", action="store_true")
+    p.set_defaults(func=cmd_retro)
+
+    p = sub.add_parser("metrics", help="factory metrics and actor audit")
+    p.set_defaults(func=cmd_metrics)
 
     p = sub.add_parser("status", help="project status")
     p.add_argument("--all", action="store_true")

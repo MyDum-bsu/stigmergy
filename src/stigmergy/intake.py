@@ -15,6 +15,7 @@ becomes an oracle or an instruction without the approval.
 from __future__ import annotations
 
 import hashlib
+import html
 import re
 import subprocess
 import time
@@ -26,10 +27,10 @@ from stigmergy.config import Config
 from stigmergy.log import Board, BoardError
 from stigmergy.model import ProjectState
 from stigmergy.runner import herdr_app
-from stigmergy.spec import Spec, SpecError
+from stigmergy.spec import Spec, SpecError, parse_frontmatter, split_frontmatter
 
 DEFAULT_SPACE = "optimization"
-PLANNER_TOOLS = ["--tools", "read,bash,write"]
+PLANNER_TOOLS = ["--tools", "read,write"]
 MAX_IDEA = 20_000
 
 
@@ -110,6 +111,7 @@ Spec frontmatter (YAML, exact keys):
   allowed_paths: [<globs the worker may change>]
   oracle_paths: [<tests that define the criterion; must exist after approval>]
   gate_inputs: [<configs restored from base>]
+  invariants: [<for high risk: state/order/duplication invariants, in words>]
   dod: "<one shell command: fails before, passes after>"
   negative_control:
     corpus: {paths['negative'].relative_to(paths['root'])}/
@@ -127,6 +129,21 @@ Rules:
 """
 
 
+def find_source(config: Config, source: str, source_id: str) -> tuple[str, Path] | None:
+    if not source_id:
+        return None
+    root = plan_root(config)
+    for path in sorted((root / "requests").glob("*.md")):
+        try:
+            front, _body = split_frontmatter(path.read_text(encoding="utf-8"))
+            meta = parse_frontmatter(front)
+        except (OSError, SpecError):
+            continue
+        if str(meta.get("source") or "") == source and str(meta.get("source_id") or "") == source_id:
+            return str(meta.get("id") or path.stem), path
+    return None
+
+
 def create_task(
     config: Config,
     board: Board,
@@ -137,8 +154,22 @@ def create_task(
     agent: str = "human",
     app: str = "herdr-app",
     start_planner: bool = True,
+    source: str = "human",
+    source_id: str = "",
 ) -> dict[str, Any]:
     idea = idea.strip()
+    existing = find_source(config, source, source_id)
+    if existing:
+        task_id, request = existing
+        return {
+            "task": task_id,
+            "title": "",
+            "request": str(request),
+            "prd": str(paths_for(config, task_id)["prd"]),
+            "spec": str(paths_for(config, task_id)["spec"]),
+            "planner": {"started": False, "terminal": "", "error": ""},
+            "duplicate": True,
+        }
     if not idea:
         raise BoardError("idea is empty")
     if len(idea) > MAX_IDEA:
@@ -153,7 +184,8 @@ def create_task(
         "---\n"
         f"id: {task_id}\n"
         f"created: {time.strftime('%Y-%m-%dT%H:%M:%S%z')}\n"
-        "source: human\n"
+        f"source: {source}\n"
+        f"source_id: {source_id}\n"
         "trust: untrusted\n"
         "---\n\n"
         "# Raw request\n\n"
@@ -220,6 +252,42 @@ def plan_list(config: Config, board: Board) -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+def render_plan(config: Config, task_id: str) -> Path:
+    """A compact, mobile-readable plan artifact; approval stays a CLI step."""
+    data = plan_show(config, task_id)
+    paths = paths_for(config, task_id)
+    out = paths["root"] / "plans" / f"{task_id}.html"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    title = html.escape(task_id)
+    sections = []
+    for key, label in (("prd", "PRD"), ("spec", "SPEC"), ("request", "RAW REQUEST")):
+        body = data.get(key) or "(empty)"
+        sections.append(
+            f"<section><h2>{label}</h2><pre>{html.escape(body)}</pre></section>"
+        )
+    out.write_text(
+        "<!doctype html><html><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        f"<title>{title}</title><style>"
+        "body{margin:0 auto;max-width:860px;padding:24px;background:#101012;"
+        "color:#ece9e4;font:15px/1.5 system-ui,sans-serif}"
+        "h1{font-size:24px;margin:0 0 6px}h2{font-size:14px;letter-spacing:.08em;"
+        "text-transform:uppercase;color:#f4d345;margin:24px 0 8px}"
+        "pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#19191c;"
+        "border:1px solid #333337;border-radius:10px;padding:14px}"
+        "code{color:#f4d345}.bar{border-left:3px solid #f4d345;padding:10px 12px;"
+        "background:#19191c;border-radius:8px}"
+        "</style></head><body>"
+        f"<h1>Plan · {title}</h1>"
+        f"<div class=\"bar\">Approve: <code>stg plan approve {title}</code> · "
+        f"Reject: <code>stg plan show {title}</code></div>"
+        + "".join(sections)
+        + "</body></html>\n",
+        encoding="utf-8",
+    )
+    return out
 
 
 def plan_show(config: Config, task_id: str) -> dict[str, Any]:

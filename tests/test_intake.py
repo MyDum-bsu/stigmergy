@@ -120,3 +120,37 @@ def test_plan_show_and_list(repo: Path, monkeypatch) -> None:
     assert "Добавить виджет" in shown["request"]
     rows = intake.plan_list(config, board)
     assert any(row["id"] == task_id and row["request"] for row in rows)
+
+
+def test_source_id_is_idempotent(repo: Path, monkeypatch) -> None:
+    board = Board(repo)
+    config = Config.load(repo)
+    monkeypatch.setattr(
+        intake.herdr_app, "ensure_space", lambda app, name, folder: {"space": "sp0", "tabs": []}
+    )
+    monkeypatch.setattr(
+        intake.herdr_app, "create_tab", lambda *args, **kwargs: {"space": "sp0", "terminal": "t"}
+    )
+    first = intake.create_task(
+        config, board, "Инцидент из чата", source="telegram", source_id="msg-1"
+    )
+    second = intake.create_task(
+        config, board, "Инцидент из чата", source="telegram", source_id="msg-1"
+    )
+    assert second.get("duplicate") is True
+    assert second["task"] == first["task"]
+
+
+def test_render_plan_writes_html(repo: Path, monkeypatch) -> None:
+    board = Board(repo)
+    config = Config.load(repo)
+    monkeypatch.setattr(
+        intake.herdr_app, "ensure_space", lambda app, name, folder: {"space": "sp0", "tabs": []}
+    )
+    monkeypatch.setattr(
+        intake.herdr_app, "create_tab", lambda *args, **kwargs: {"space": "sp0", "terminal": "t"}
+    )
+    task_id = intake.create_task(config, board, "План")["task"]
+    path = intake.render_plan(config, task_id)
+    assert path.exists()
+    assert "stg plan approve" in path.read_text(encoding="utf-8")

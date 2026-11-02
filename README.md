@@ -22,12 +22,18 @@
 stg task "добавить HQ-сканы в трекер"   # request + task + Plan tab
 stg plan list
 stg plan show <ID>
+stg plan render <ID>                    # HTML-артефакт плана
 stg plan approve <ID>                   # commit spec в dev + attach к task
 stg dispatcher --once                   # один тик
 stg dispatcher --watch                  # демон: старт/финиш/уведомления
+stg dispatcher --all --once             # один тик по registry
 stg judge search "куда деплоить"
 stg judge add "куда деплоить?" --decision "только через поезд" \
   --quote "не выкатываем без гейта" --source decisions/runbook.md
+stg metrics                             # human touches, gate failures, anonymous
+stg board audit                         # события без actor/project
+stg retro --days 7 --write              # weekly lessons report
+stg critique <ID>                       # независимый critic, другой model
 ```
 
 Инварианты P0:
@@ -44,13 +50,14 @@ stg judge add "куда деплоить?" --decision "только через �
 
 ## Состояние (2026-11-01)
 
-Реализованы S0–S7 и P0 dark factory: intake, plan approval, dispatcher,
-lead-канал, judge/decisions. P1/P2 (formal invariants, weekly learning,
-plan artifact, proactivity) — следующие слои.
+Реализованы S0–S7 и P0 dark factory: intake, plan approval + HTML artifact,
+dispatcher, lead-канал, judge/decisions, metrics/audit, weekly retro, critic
+tab, source idempotency. Formal TLA+/TLC, auto-judge, enforced critic,
+proactive watchers, Telegram/GitHub and cost telemetry — следующие слои.
 
 Проверено в этом окружении:
 
-- `uv run pytest -q` — 58 passed; `uv run ruff check .` — clean.
+- `uv run pytest -q` — 66 passed; `uv run ruff check .` — clean.
 - T5 end-to-end на клоне `optimization`: `stg run T5-land --runner noop --auto
   --no-sandbox` → `gate.passed`, `control.proven`, `integration.passed`,
   `merge.done`; `dev` fast-forward на `a9f57f6`, `.beads` не в дереве,

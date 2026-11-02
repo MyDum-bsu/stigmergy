@@ -33,15 +33,17 @@ medium/high обязателен negative control.
 
 ## GitHub
 
-GitHub (`MyDum-bsu/stigmergy`) — публичный слой: issue лишь зеркало задачи, источник истины — доска.
+GitHub (`MyDum-bsu/stigmergy`) — внешний слой коммуникации: issue — зеркало,
+источник истины — доска.
 
-- Вход: `gh issue view <N>` и `gh issue list` — прочитать постановку и очередь; issue
-  заполняет `stg mirror`, правки постановки идут событием доски, а не правкой issue.
-- Выход: `gh pr create --base dev` из feature-ветки (или `stg github pr <id>`, если
-  есть human-токен); прямых пушей в `dev` и `main` нет.
-- Учёт: `stg board` — `list`, `show <id>`, `status`; PR привязывается к задаче командой
-  `stg board pr <id> --url <ссылка на PR>`, номер PR берётся из ссылки.
-- Ревью и комментарии: `gh pr review`, `gh pr comment`, `stg github comment <id>`;
-  issue — только зеркальное уведомление, обсуждение ведёт доска.
-- Закрытие задачи — событие доски (`stg worker done`), issue закрывает контур после merge,
-  не worker.
+- Вход: issue с меткой `stigmergy`; `stg github sync --apply` импортирует его в
+  request/task, комментарии issue попадают в board как `github.comment.in`.
+  `gh issue view <N>` / `gh issue list` — только чтение внешнего слоя.
+- Выход: `stg github pr <id> --push` или `gh pr create --base dev`; PR
+  привязывается к задаче через `stg board pr <id> --url <ссылка>`.
+- Учёт: `stg board list|show <id>|status`; issue не является вторым трекером,
+  его состояние не заменяет событие доски.
+- Ревью и комментарии: `stg github comment <id> --text ...` или `gh pr comment`;
+  обсуждение ведёт доска, issue — уведомление.
+- Закрытие: `worker done` → gate → merge; issue закрывает контур после
+  `task.done`, не worker.

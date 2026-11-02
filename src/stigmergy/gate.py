@@ -115,6 +115,11 @@ def _matched_paths(wt: Path, patterns: list[str]) -> list[Path]:
 def _env(config: Config, home: Path, extra: dict[str, str] | None = None) -> dict[str, str]:
     env = sandbox.default_env(config.gate.get("env") or {})
     env["HOME"] = str(home)
+    venv = config.root / ".venv"
+    if (venv / "bin" / "python").exists():
+        env["PATH"] = f"{venv / 'bin'}:{env.get('PATH', '')}"
+        env["UV_PROJECT_ENVIRONMENT"] = str(venv)
+        env["UV_NO_SYNC"] = "1"
     if extra:
         env.update({str(k): str(v) for k, v in extra.items()})
     return env

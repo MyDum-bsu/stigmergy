@@ -26,6 +26,9 @@ space = "stigmergy"
 [factory]
 auto_approve = true
 
+[dispatcher]
+max_retries = 3
+
 [risk]
 low = "auto"
 medium = "auto"

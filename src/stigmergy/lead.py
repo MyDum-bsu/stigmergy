@@ -23,6 +23,9 @@ the shell (stg, hc) and reads.
 Board root: {config.root}
 Project space: {space}
 
+Always prefix stg commands with `--board {config.root}`. Do not rely on the
+current directory, especially after `cd`: a worktree has no board of its own.
+
 Human task intake (the human does not create branches or specs):
   stg task "<raw idea>"
 That creates the request, the task, and a Plan tab. When the plan is ready:

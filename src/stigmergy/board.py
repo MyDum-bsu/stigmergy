@@ -268,12 +268,17 @@ def block(board: Board, config: Config, task_id: str, agent: str, question: str)
 
 
 def answer(board: Board, config: Config, task_id: str, by: str, text: str) -> dict:
-    if by != "human":
-        raise BoardError("answer is human-only: pass --by human")
+    if by not in {"human", "lead"}:
+        raise BoardError("answer is human-only or lead-only: pass --by human|lead")
+    state = ProjectState.from_events(board.read(), project=config.name)
+    task = state.task(task_id)
+    if by == "lead" and task.risk == "high":
+        raise BoardError("high-risk answer is human-only")
+    actor = _actor("human", "human") if by == "human" else _actor("lead", "agent")
     return board.append(
         "task.answered",
-        _actor("human", "human"),
-        _attrs(config.name, task_id, {"answer": text}),
+        actor,
+        _attrs(config.name, task_id, {"answer": text, "answered.by": by}),
         f"answer {task_id}",
     )
 

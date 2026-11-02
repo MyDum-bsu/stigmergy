@@ -67,7 +67,7 @@ def new_episode_id() -> str:
     return f"ep_{time.strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:6]}"
 
 
-def build_prompt(task: Task, spec: Spec, workspace: Path) -> str:
+def build_prompt(task: Task, spec: Spec, workspace: Path, agent: str = "stg") -> str:
     oracle = ", ".join(spec.oracle_paths) if spec.oracle_paths else "none"
     allowed = ", ".join(task.allowed_paths or spec.allowed_paths) or "see spec"
     return f"""You are the implementer for stigmergy task {task.id}.
@@ -83,7 +83,10 @@ Spec:
 Rules:
 - Work only inside the workspace. Do not touch oracle paths.
 - Do not merge or move branches. The contour commits the tree and runs the gate.
-- If you are blocked on a decision, stop and report the question; do not guess.
+- If you are blocked on a decision, run exactly:
+  `stg board block {task.id} --agent {agent} --question "<one question>"`
+  and stop. Do not use AskUserQuestion and do not ask the human: the lead
+  answers through `stg lead answer` and resumes you.
 - When the work is done, stop. The gate decides whether it is done.
 """
 
@@ -134,17 +137,21 @@ def start_episode(
             {"workspace.path": str(wt.path), "vcs.branch": wt.branch, "vcs.base": wt.base},
         )
     episode = new_episode_id()
-    prompt = build_prompt(task, load_for(config.root, wt.base, task.spec), wt.path)
+    prompt = build_prompt(task, load_for(config.root, wt.base, task.spec), wt.path, agent=agent)
     handle = None
     if runner == "herdr-app":
         from stigmergy.runner.herdr_app import HerdrAppRunner
 
+        space = space or str(config.runner.get("space", "") or "") or None
+        tab_name = tab_name or (f"{task.id} · {task.title}".strip(" ·") if task.title else task.id)
         app_runner = HerdrAppRunner(
             app=str(config.runner.get("app", "herdr-app")),
             agent=str(config.runner.get("agent", "pi")),
             timeout_s=int(config.runner.get("prompt_timeout_s", 1800)),
             space=space,
             tab_name=tab_name,
+            space_folder=config.root,
+            agent_args=["--exclude-tools", "AskUserQuestion"],
         )
         try:
             handle = app_runner.start(task.id, prompt, wt.path, wait=wait_runner)

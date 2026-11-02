@@ -253,7 +253,8 @@ def paths_allowed(paths: list[str], patterns: list[str]) -> tuple[bool, list[str
     bad: list[str] = []
     for path in paths:
         if any(
-            fnmatch(path, pattern)
+            path == pattern
+            or fnmatch(path, pattern)
             or (pattern.endswith("/**") and path.startswith(pattern[:-3] + "/"))
             for pattern in patterns
         ):

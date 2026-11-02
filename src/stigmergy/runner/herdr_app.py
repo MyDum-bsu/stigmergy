@@ -110,19 +110,50 @@ def unique_name(app: str, base: str) -> str:
     return f"{base}-{int(time.time())}"
 
 
-def create_space(app: str, name: str, folder: Path, agent: str, task: str) -> dict:
+def create_space(
+    app: str,
+    name: str,
+    folder: Path,
+    agent: str,
+    task: str,
+    agent_args: list[str] | None = None,
+) -> dict:
     ensure_app(app)
     return _do(
         app,
         "space.new",
         name=unique_name(app, name),
         folder=str(folder),
-        argv=[agent],
+        argv=[agent, *(agent_args or [])],
         task=task,
     )
 
 
-def create_tab(app: str, space: str, name: str, folder: Path, agent: str, task: str) -> dict:
+def find_space(app: str, name: str) -> dict | None:
+    for space in spaces(app):
+        if str(space.get("name", "")) == name:
+            return space
+    return None
+
+
+def ensure_space(app: str, name: str, folder: Path) -> dict:
+    """Проектный space (папка репозитория), без агента: задачи — вкладки."""
+    ensure_app(app)
+    space = find_space(app, name)
+    if space is not None:
+        return space
+    return _do(app, "space.new", name=name, folder=str(folder))
+
+
+def create_tab(
+    app: str,
+    space: str,
+    name: str,
+    folder: Path,
+    agent: str,
+    task: str,
+    agent_args: list[str] | None = None,
+) -> dict:
     ensure_app(app)
     return _do(
         app,
@@ -130,7 +161,7 @@ def create_tab(app: str, space: str, name: str, folder: Path, agent: str, task: 
         name=name,
         space=space,
         folder=str(folder),
-        argv=[agent],
+        argv=[agent, *(agent_args or [])],
         task=task,
     )
 
@@ -177,7 +208,7 @@ def kill(terminal: str) -> dict:
 
 def close_space(space_id: str) -> dict:
     try:
-        return _do(DEFAULT_APP, "space.close", id=space_id, confirmed=True)
+        return _do(DEFAULT_APP, "space.close", id=space_id, confirmed="true")
     except HerdrAppError:
         return {"ok": False}
 
@@ -235,26 +266,41 @@ class HerdrAppRunner:
         timeout_s: int = 1800,
         space: str | None = None,
         tab_name: str | None = None,
+        space_folder: Path | None = None,
+        agent_args: list[str] | None = None,
     ):
         self.app = app
         self.agent = agent
         self.timeout_s = timeout_s
         self.space = space
         self.tab_name = tab_name
+        self.space_folder = space_folder
+        self.agent_args = list(agent_args or [])
 
     def start(self, task_id: str, prompt: str, workspace: Path, wait: bool = True) -> RunnerHandle:
         if self.space:
+            project_space = ensure_space(
+                self.app, self.space, self.space_folder or workspace
+            )
+            space = str(project_space.get("space") or project_space.get("id") or "")
             created = create_tab(
                 self.app,
-                self.space,
-                self.tab_name or f"stg-{task_id}",
+                space,
+                self.tab_name or task_id,
                 workspace,
                 self.agent,
                 prompt,
+                agent_args=self.agent_args,
             )
-            space = self.space
         else:
-            created = create_space(self.app, f"{PREFIX}{task_id}", workspace, self.agent, prompt)
+            created = create_space(
+                self.app,
+                f"{PREFIX}{task_id}",
+                workspace,
+                self.agent,
+                prompt,
+                agent_args=self.agent_args,
+            )
             space = str(created.get("space", ""))
         terminal = str(created.get("terminal", ""))
         if not space or not terminal:

@@ -35,13 +35,21 @@ def checks(config: Config, board: Board | None = None) -> list[dict]:
     add("systemd --user", ok or detail == "degraded", detail, required=False)
     add("herdr", shutil.which("herdr") is not None, shutil.which("herdr") or "not found", required=False)
     runner_kind = str(config.runner.get("kind", "manual"))
-    add("runner", runner_kind in {"manual", "herdr"}, runner_kind)
-    if runner_kind == "herdr":
+    if runner_kind == "herdr-app":
+        from stigmergy.runner import herdr_app
+
+        app = str(config.runner.get("app", herdr_app.DEFAULT_APP))
+        state = herdr_app.status(app)
+        add("runner", state["ok"], app if state["ok"] else str(state.get("error", app)))
+    elif runner_kind == "herdr":
+        add("runner", True, runner_kind)
         from stigmergy.runner import herdr as herdr_mod
 
         state = herdr_mod.status(str(config.runner.get("session", "factory")))
         detail = state["text"].splitlines()[-1] if state["text"] else ""
         add("herdr server", state["ok"], detail)
+    else:
+        add("runner", runner_kind == "manual", runner_kind)
     registered = {item["name"] for item in registry_load()}
     add("registry", config.name in registered, f"{config.name} in {len(registered)} project(s)", required=False)
     return out

@@ -58,7 +58,7 @@ def test_detached_start_does_not_wait(monkeypatch) -> None:
     monkeypatch.setattr(
         herdr_app,
         "create_space",
-        lambda app, name, folder, agent, task: {"space": "sp1", "terminal": "t1"},
+        lambda app, name, folder, agent, task, agent_args=None: {"space": "sp1", "terminal": "t1"},
     )
     called = []
     monkeypatch.setattr(herdr_app, "wait_until_settled", lambda *a, **k: called.append(1))
@@ -77,3 +77,42 @@ def test_cleanup_only_factory_spaces(monkeypatch) -> None:
     monkeypatch.setattr(herdr_app, "close_space", lambda space: closed.append(space))
     assert herdr_app.cleanup("herdr-app") == ["stg-A"]
     assert closed == ["sp1"]
+
+
+def test_project_space_reuses_and_opens_tab(monkeypatch) -> None:
+    monkeypatch.setattr(herdr_app, "spaces", lambda app: [{"name": "optimization", "id": "sp0"}])
+    monkeypatch.setattr(herdr_app, "ensure_app", lambda app: None)
+    seen = {}
+
+    def fake_tab(app, space, name, folder, agent, task, agent_args=None):
+        seen.update(space=space, name=name, folder=str(folder))
+        return {"space": space, "terminal": "t1"}
+
+    monkeypatch.setattr(herdr_app, "create_tab", fake_tab)
+    runner = herdr_app.HerdrAppRunner(
+        space="optimization", tab_name="mo-a7j · HQ", space_folder=Path("/repo")
+    )
+    handle = runner.start("mo-a7j", "prompt", Path("/repo/.factory/worktrees/x"), wait=False)
+    assert seen == {"space": "sp0", "name": "mo-a7j · HQ", "folder": "/repo/.factory/worktrees/x"}
+    assert handle.meta["space"] == "sp0"
+
+
+def test_project_space_is_created_when_missing(monkeypatch) -> None:
+    monkeypatch.setattr(herdr_app, "spaces", lambda app: [])
+    monkeypatch.setattr(herdr_app, "ensure_app", lambda app: None)
+    calls = {}
+
+    def fake_do(app, command, **kwargs):
+        calls[command] = kwargs
+        return {"space": "sp9"}
+
+    monkeypatch.setattr(herdr_app, "_do", fake_do)
+    monkeypatch.setattr(
+        herdr_app,
+        "create_tab",
+        lambda app, space, name, folder, agent, task, agent_args=None: {"space": space, "terminal": "t1"},
+    )
+    runner = herdr_app.HerdrAppRunner(space="optimization", space_folder=Path("/repo"))
+    handle = runner.start("mo-a7j", "prompt", Path("/repo/.factory/worktrees/x"), wait=False)
+    assert calls["space.new"] == {"name": "optimization", "folder": "/repo"}
+    assert handle.meta["space"] == "sp9"

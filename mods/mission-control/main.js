@@ -46,6 +46,14 @@ const place = (folder) => {
 
 export default class MissionControl extends View {
   init(_props, cx) {
+    // "tasks" — узкая доска без gates/events/space-карточек; "full" — всё.
+    let props = _props;
+    if (typeof props === "string") {
+      try { props = JSON.parse(props); } catch { props = {}; }
+    }
+    props = props || {};
+    this.view = props.view === "full" ? "full" : "tasks";
+    this.boardPath = props.board || BOARD;
     // When each agent's status was last seen to change: the duration a card
     // shows. Kept across restarts, as the agents mod keeps its own marks.
     this.since = JSON.parse(localStorage.getItem("since") ?? "{}");
@@ -66,9 +74,9 @@ export default class MissionControl extends View {
     cx.spawn(async (cx) => {
       try {
         const [list, log, status] = await Promise.all([
-          exec("stg", ["--board", BOARD, "board", "list", "--json"]),
-          exec("stg", ["--board", BOARD, "board", "log", "--limit", "40", "--json"]),
-          exec("stg", ["--board", BOARD, "status", "--json"]),
+          exec("stg", ["--board", this.boardPath, "board", "list", "--json"]),
+          exec("stg", ["--board", this.boardPath, "board", "log", "--limit", "40", "--json"]),
+          exec("stg", ["--board", this.boardPath, "status", "--json"]),
         ]);
         if (list.code !== 0) throw new Error(list.stderr || "stg board list failed");
         if (log.code !== 0) throw new Error(log.stderr || "stg board log failed");
@@ -374,12 +382,14 @@ export default class MissionControl extends View {
     const isGate = (event) => /^(gate|control|integration|merge)\./.test(event.action);
     const gateEvents = (b.events ?? []).filter(isGate).slice(-5).reverse();
     const other = (b.events ?? []).filter((event) => !isGate(event)).slice(-5).reverse();
-    return v_flex()
+    const base = v_flex()
       .child(this.section(t, "Board", `${queued} queued`, t.accent))
       .when(Boolean(this.boardError), (el) => el.child(this.empty(t, this.boardError)))
       .child(this.boardCounters(t, { queued, active, gated, done }))
       .when(tasks.length === 0, (el) => el.child(this.empty(t, "Queue is empty.")))
-      .children(tasks.map((task) => this.taskRow(t, task)))
+      .children(tasks.map((task) => this.taskRow(t, task)));
+    if (this.view === "tasks") return base;
+    return base
       .child(this.section(t, "Gates / merge", null))
       .when(gateEvents.length === 0, (el) => el.child(this.empty(t, "No gate events yet.")))
       .children(gateEvents.map((event) => this.eventRow(t, event, now, true)))

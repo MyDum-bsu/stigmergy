@@ -5,7 +5,7 @@ from pathlib import Path
 from conftest import make_task_branch
 
 from stigmergy.config import Config
-from stigmergy.gate import gate_artifact, run_gate
+from stigmergy.gate import gate_artifact, paths_allowed, run_gate
 from stigmergy.spec import Spec
 
 
@@ -82,3 +82,10 @@ noop
     assert result.exit_code == 0
     assert result.control["result"] == "dead"
     assert not result.passed
+
+
+def test_paths_allowed_literal_brackets() -> None:
+    """Пути Next.js с [gid]/[sid]/[aid] — литералы, не fnmatch-классы."""
+    path = "tracker/web/app/student/[gid]/[sid]/[aid]/page.tsx"
+    ok, bad = paths_allowed([path], [path])
+    assert ok and bad == []

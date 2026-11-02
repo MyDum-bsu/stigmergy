@@ -263,6 +263,14 @@ def paths_allowed(paths: list[str], patterns: list[str]) -> tuple[bool, list[str
     return not bad, bad
 
 
+def _sandbox_glitch(stderr: str) -> bool:
+    text = stderr.lower()
+    return any(
+        marker in text
+        for marker in ("bwrap:", "rtm_newaddr", "failed to set up loopback", "loopback")
+    )
+
+
 def run_gate(
     config: Config,
     spec: Spec,
@@ -331,6 +339,17 @@ def run_gate(
                 use_sandbox=use_sandbox,
                 oracle_paths=oracle_paths,
             )
+            if code != 0 and use_sandbox and _sandbox_glitch(stderr):
+                # The sandbox itself failed to start; retry once, never bypass it.
+                code, stdout, stderr, again = _run(
+                    wt,
+                    command,
+                    env,
+                    timeout,
+                    use_sandbox=use_sandbox,
+                    oracle_paths=oracle_paths,
+                )
+                duration += again
         except subprocess.TimeoutExpired as exc:
             code, stdout, stderr, duration = 124, str(exc.stdout or ""), "timeout", timeout * 1000
         (artifact_dir / "stdout.log").write_text(stdout, encoding="utf-8")

@@ -89,3 +89,10 @@ def test_paths_allowed_literal_brackets() -> None:
     path = "tracker/web/app/student/[gid]/[sid]/[aid]/page.tsx"
     ok, bad = paths_allowed([path], [path])
     assert ok and bad == []
+
+
+def test_sandbox_glitch_detector() -> None:
+    from stigmergy.gate import _sandbox_glitch
+
+    assert _sandbox_glitch("bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted")
+    assert not _sandbox_glitch("assert 1 == 2")

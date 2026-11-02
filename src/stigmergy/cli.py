@@ -504,6 +504,45 @@ def cmd_mirror(args: argparse.Namespace) -> int:
     return 0 if data.get("ok") else 1
 
 
+def cmd_github(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from stigmergy import github, human
+
+    cmd = args.github_cmd
+    if cmd == "status":
+        data = github.status(config, board)
+        _emit(args, data, json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    if cmd == "sync":
+        if args.apply:
+            human.require()
+        data = github.sync(
+            config,
+            board,
+            apply=args.apply,
+            include_import=not args.no_import,
+            include_push=not args.no_push,
+            start_planner=not args.no_planner,
+        )
+        _emit(args, data, json.dumps(data, ensure_ascii=False, indent=2))
+        return 0 if data.get("ok") else 1
+    if cmd == "comment":
+        human.require()
+        data = github.comment(config, board, args.id, args.text)
+        _emit(args, data, f"comment {args.id} → #{data['issue']} {data['url']}")
+        return 0
+    if cmd == "pr":
+        human.require()
+        data = github.open_pr(config, board, args.id, push=args.push, draft=args.draft)
+        _emit(args, data, data["url"])
+        return 0
+    if cmd == "checks":
+        data = github.checks(config, board, args.id)
+        _emit(args, data, json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    raise RuntimeError(f"unknown github command: {cmd}")
+
+
 def cmd_usage(args: argparse.Namespace) -> int:
     _root, config, board = _ctx(args)
     from stigmergy import usage
@@ -1376,6 +1415,29 @@ def build_parser() -> argparse.ArgumentParser:
     q = mi.add_parser("github")
     q.add_argument("--apply", action="store_true")
     q.set_defaults(func=cmd_mirror)
+
+    p = sub.add_parser("github", help="GitHub issues, comments and PRs")
+    gh = p.add_subparsers(dest="github_cmd", required=True)
+    q = gh.add_parser("status")
+    q.set_defaults(func=cmd_github)
+    q = gh.add_parser("sync")
+    q.add_argument("--apply", action="store_true")
+    q.add_argument("--no-import", action="store_true")
+    q.add_argument("--no-push", action="store_true")
+    q.add_argument("--no-planner", action="store_true")
+    q.set_defaults(func=cmd_github)
+    q = gh.add_parser("comment")
+    q.add_argument("id")
+    q.add_argument("--text", required=True)
+    q.set_defaults(func=cmd_github)
+    q = gh.add_parser("pr")
+    q.add_argument("id")
+    q.add_argument("--push", action="store_true")
+    q.add_argument("--draft", action="store_true")
+    q.set_defaults(func=cmd_github)
+    q = gh.add_parser("checks")
+    q.add_argument("id")
+    q.set_defaults(func=cmd_github)
 
     p = sub.add_parser("usage", help="token/duration/cost usage")
     u = p.add_subparsers(dest="usage_cmd", required=True)

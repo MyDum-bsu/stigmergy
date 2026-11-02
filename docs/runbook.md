@@ -204,7 +204,31 @@ stg visual check --target http://127.0.0.1:3000 --run  # человек
 Токен Telegram берётся из env, не из репозитория. `mirror github --apply`
 также требует human token; без него — только dry-run payloads.
 
-## 13. Диагностика
+## 13. GitHub как канал связи
+
+```toml
+[github]
+repo = ""                 # пусто → gh repo view (origin)
+label = "stigmergy"       # какие issues импортировать
+```
+
+```bash
+stg github status
+stg github sync                    # dry-run: import + comments
+stg github sync --apply             # человек: импорт issues + push комментариев
+stg github sync --apply --no-push   # только импорт
+stg github comment <ID> --text "..."
+stg github pr <ID> --push
+stg github checks <ID>
+```
+
+Issue с меткой `stigmergy` становится request/task; `stg:<ID>` в labels или
+`github.issue.linked` связывает issue с задачей. Комментарии issue пишутся в
+board как `github.comment.in`; `task.note`/`task.answered` после link уходят
+в issue при `--push`. `task.pr` хранит PR URL, `checks` читает CI, но вердикт
+по-прежнему даёт gate, не GitHub. Все write-операции требуют human token.
+
+## 14. Диагностика
 
 | Симптом | Что проверить |
 |---|---|
@@ -216,7 +240,7 @@ stg visual check --target http://127.0.0.1:3000 --run  # человек
 | `GoUsageLimitError` | квота провайдера; эпизод падает, не мержится |
 | `database is locked` (board) | второй писатель; `flock` ждёт, проверь долгий процесс |
 
-## 14. Безопасность
+## 15. Безопасность
 
 - `main` не пишется фабрикой; мерж только в `base` (`dev`), fast-forward.
 - `data/`, `tracker/data/`, `$HOME`, SSH и креды не видны в episode/gate.

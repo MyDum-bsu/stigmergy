@@ -44,6 +44,12 @@ stg promote                              # dry-run dev → main (human --apply)
 stg notify --text "gate failed"          # dry-run; --send is human-only
 stg visual check --target http://...     # dry-run; --run is human-only
 stg feed --file .factory/inbox.jsonl
+stg github status                        # repo + linked issues
+stg github sync                          # dry-run issue/comment sync
+stg github sync --apply                  # human: import issues + push comments
+stg github comment <ID> --text "..."     # human: comment on linked issue
+stg github pr <ID> --push                # human: open PR from task branch
+stg github checks <ID>
 stg mutation <ID>
 stg mirror github
 stg judge add "куда деплоить?" --decision "только через поезд" \
@@ -77,7 +83,7 @@ installed as user systemd timers on this machine.
 
 Проверено в этом окружении:
 
-- `uv run pytest -q` — 109 passed; `uv run ruff check .` — clean.
+- `uv run pytest -q` — 112 passed; `uv run ruff check .` — clean.
 - T5 end-to-end на клоне `optimization`: `stg run T5-land --runner noop --auto
   --no-sandbox` → `gate.passed`, `control.proven`, `integration.passed`,
   `merge.done`; `dev` fast-forward на `a9f57f6`, `.beads` не в дереве,
@@ -100,6 +106,10 @@ installed as user systemd timers on this machine.
 - `stg notify` / `stg visual` — dry-run adapters; real `--send`/`--run` требуют
   human token. GitHub mirror `--apply` — human token, реального создания
   issues не было.
+- GitHub communication: `stg github sync` (dry-run) / `--apply` импортирует
+  issues с меткой `stigmergy`, связывает их с задачами, переносит комментарии
+  в board и обратно; `stg github pr/checks` — PR и CI-статусы. Board остаётся
+  source of truth.
 - `stg migrate --check /home/mydum/src/optimization/.agent` — 292 события,
   105 задач, схема валидна.
 - timers: `stigmergy-learn.timer` → Mon 09:00, `stigmergy-persona.timer` →

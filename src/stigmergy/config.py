@@ -43,6 +43,7 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "webhook_url": "",
     },
     "visual": {"command": "", "timeout_seconds": 120},
+    "github": {"repo": "", "label": "stigmergy", "close_on_done": False},
 }
 
 
@@ -155,6 +156,10 @@ webhook_url = ""
 
 [visual]
 command = ""
+
+[github]
+repo = ""
+label = "stigmergy"
 
 [risk]
 low = "auto"

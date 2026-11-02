@@ -158,6 +158,15 @@ def tick(
     snapshot = state_of(board, config.name)
     active = snapshot.current()
     blocked = snapshot.blocked()
+    active_ids = {task.id for task in active}
+    for task_id in list(finishing):
+        if task_id not in active_ids:
+            finishing.pop(task_id, None)
+    known = {task.id: task for task in snapshot.all()}
+    for task_id in list(notified):
+        task = known.get(task_id)
+        if task is None or task.status in {"done", "failed", "rejected"}:
+            notified.pop(task_id, None)
     busy = [task for task in snapshot.all() if task.status in ACTIVE_STATIONS or task.status == "blocked"]
     max_retries = max(0, max_retries)
 

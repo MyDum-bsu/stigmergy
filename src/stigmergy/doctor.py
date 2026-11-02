@@ -34,6 +34,10 @@ def checks(config: Config, board: Board | None = None) -> list[dict]:
     ok, detail = _cmd(["systemctl", "--user", "is-system-running"])
     add("systemd --user", ok or detail == "degraded", detail, required=False)
     add("herdr", shutil.which("herdr") is not None, shutil.which("herdr") or "not found", required=False)
+    from stigmergy.formal import jar_path
+
+    tla = jar_path(config)
+    add("tla", tla is not None, str(tla or "tla2tools.jar not found"), required=False)
     runner_kind = str(config.runner.get("kind", "manual"))
     if runner_kind == "herdr-app":
         from stigmergy.runner import herdr_app

@@ -24,6 +24,7 @@ stg plan list
 stg plan show <ID>
 stg plan render <ID>                    # HTML-артефакт плана
 stg plan approve <ID>                   # commit spec в dev + attach к task
+stg verify                              # TLA+ lifecycle model + live invariants
 stg dispatcher --once                   # один тик
 stg dispatcher --watch                  # демон: старт/финиш/уведомления
 stg dispatcher --all --once             # один тик по registry
@@ -57,7 +58,7 @@ proactive watchers, Telegram/GitHub and cost telemetry — следующие с
 
 Проверено в этом окружении:
 
-- `uv run pytest -q` — 68 passed; `uv run ruff check .` — clean.
+- `uv run pytest -q` — 72 passed; `uv run ruff check .` — clean.
 - T5 end-to-end на клоне `optimization`: `stg run T5-land --runner noop --auto
   --no-sandbox` → `gate.passed`, `control.proven`, `integration.passed`,
   `merge.done`; `dev` fast-forward на `a9f57f6`, `.beads` не в дереве,

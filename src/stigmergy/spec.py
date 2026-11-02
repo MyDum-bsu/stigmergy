@@ -165,6 +165,11 @@ class Spec:
         return [str(x) for x in (self.meta.get("oracle_paths") or [])]
 
     @property
+    def skills(self) -> list[str]:
+        raw = self.meta.get("skills") or []
+        return [str(item) for item in raw] if isinstance(raw, list) else []
+
+    @property
     def invariants(self) -> list[str]:
         raw = self.meta.get("invariants") or []
         return [str(item) for item in raw] if isinstance(raw, list) else []
@@ -216,6 +221,8 @@ class Spec:
             errors.append("negative_control.corpus is required for medium/high risk")
         if self.risk == "high" and not self.invariants:
             errors.append("invariants are required for high risk (formal invariants before code)")
+        if any(not skill for skill in self.skills):
+            errors.append("skills must be non-empty paths")
         return errors
 
     def validate_against_repo(self, repo: str | Path, base: str) -> list[str]:

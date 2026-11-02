@@ -119,6 +119,7 @@ Spec frontmatter (YAML, exact keys):
   oracle_paths: [<tests that define the criterion; must exist after approval>]
   gate_inputs: [<configs restored from base>]
   invariants: [<for high risk: state/order/duplication invariants, in words>]
+  skills: [<optional agent skill paths, e.g. ~/.agents/skills/code-review/SKILL.md>]
   dod: "<one shell command: fails before, passes after>"
   negative_control:
     corpus: {paths['negative'].relative_to(paths['root'])}/

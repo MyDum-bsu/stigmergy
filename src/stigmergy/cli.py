@@ -434,6 +434,15 @@ def cmd_critique(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_verify(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from stigmergy import formal
+
+    data = formal.verify_core(config, board)
+    _emit(args, data, formal.text(data))
+    return 0 if data["passed"] else 1
+
+
 def cmd_retro(args: argparse.Namespace) -> int:
     _root, config, board = _ctx(args)
     from stigmergy import retro
@@ -1079,6 +1088,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("--app", default="herdr-app")
     p.set_defaults(func=cmd_critique)
+
+    p = sub.add_parser("verify", help="TLA+ lifecycle model + live invariants")
+    p.set_defaults(func=cmd_verify)
 
     p = sub.add_parser("retro", help="weekly learning report")
     p.add_argument("--days", type=int, default=7)

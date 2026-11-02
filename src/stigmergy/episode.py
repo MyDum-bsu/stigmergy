@@ -148,15 +148,17 @@ def start_episode(
             {"workspace.path": str(wt.path), "vcs.branch": wt.branch, "vcs.base": wt.base},
         )
     episode = new_episode_id()
-    prompt = build_prompt(
-        task, load_for(config.root, wt.base, task.spec), wt.path, agent=agent, board_root=config.root
-    )
+    spec = load_for(config.root, wt.base, task.spec)
+    prompt = build_prompt(task, spec, wt.path, agent=agent, board_root=config.root)
     handle = None
     if runner == "herdr-app":
         from stigmergy.runner.herdr_app import HerdrAppRunner
 
         space = space or str(config.runner.get("space", "") or "") or None
         tab_name = tab_name or (f"{task.id} · {task.title}".strip(" ·") if task.title else task.id)
+        agent_args = ["--exclude-tools", "AskUserQuestion"]
+        for skill in spec.skills:
+            agent_args.extend(["--skill", skill])
         app_runner = HerdrAppRunner(
             app=str(config.runner.get("app", "herdr-app")),
             agent=str(config.runner.get("agent", "pi")),
@@ -164,7 +166,7 @@ def start_episode(
             space=space,
             tab_name=tab_name,
             space_folder=config.root,
-            agent_args=["--exclude-tools", "AskUserQuestion"],
+            agent_args=agent_args,
         )
         try:
             handle = app_runner.start(task.id, prompt, wt.path, wait=wait_runner)

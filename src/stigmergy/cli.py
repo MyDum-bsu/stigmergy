@@ -834,12 +834,17 @@ def cmd_plan(args: argparse.Namespace) -> int:
         data = intake.auto_approve_plan(config, board, args.id)
         _emit(args, data, f"auto-approved {args.id}" if data.get("ok") else data.get("detail", "not approved"))
         return 0 if data.get("ok") else 1
-    if args.plan_cmd == "approve":
-        from stigmergy import human
+    if args.plan_cmd in {"approve", "reject"}:
+        from stigmergy import human, planinbox
 
         human.require()
-        data = intake.approve_plan(config, board, args.id, agent=args.agent)
-        _emit(args, data, f"approved {data['task']} spec={data['spec_sha']}")
+        data = planinbox.apply_decision(
+            config, board, args.id, args.plan_cmd, actor=args.agent, via="cli"
+        )
+        if args.plan_cmd == "approve":
+            _emit(args, data, f"approved {data['task']} spec={data['spec_sha']}")
+        else:
+            _emit(args, data, f"rejected {args.id}")
         return 0
     raise RuntimeError(f"unknown plan command: {args.plan_cmd}")
 
@@ -1397,6 +1402,10 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("id")
     q.set_defaults(func=cmd_plan)
     q = pl.add_parser("approve")
+    q.add_argument("id")
+    q.add_argument("--agent", default="human")
+    q.set_defaults(func=cmd_plan)
+    q = pl.add_parser("reject")
     q.add_argument("id")
     q.add_argument("--agent", default="human")
     q.set_defaults(func=cmd_plan)

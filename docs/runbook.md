@@ -68,6 +68,29 @@ Dispatcher сам делает policy-approve и пишет `plan.approved` с
 `approval.mode=policy`; gate и merge остаются обязательными. Всё, что не
 прошло policy, идёт обычным путём с человеческим approve.
 
+### Plan inbox: клик вместо CLI
+
+```bash
+stg plan serve <ID> --open       # localhost-страница плана
+# Approve / Reject на странице вместо stg plan approve <ID>
+stg plan approve <ID>            # тот же путь применения, что у клика
+stg plan reject <ID>             # отказ без текста, план уходит planner'у
+```
+
+Страница слушает только `127.0.0.1`, требует ключ в URL, отклоняет чужой `Host`
+и принимает только `POST` на `/plan/<ID>/action/<approve|reject>`; `GET` ничего
+не меняет. Токен формы — HMAC от `plan_id` и digest спеки, ключ живёт только в
+процессе сервера, поэтому после перезапуска `stg plan serve` старые кнопки не
+работают, а правка спеки даёт `409 spec changed since render`. Подделка или
+чужой план — `403` до проверки состояния; повторный клик — `409` и второго
+события на доске нет. Решение применяет тот же код, что CLI (`intake.approve_plan`
+/ `intake.reject_plan`), события несут `via=inbox`.
+
+Кнопок нет у fast lane и у уже решённых планов: там решать нечего. Для
+`risk: high` кнопка Approve работает только при зелёном preflight (formal-модель
+с мутантом, `mutations` в спеке, отчёт critic, negative control); иначе `409` с
+перечнем недостающего, и план остаётся `pending`.
+
 ## 4. Задача и ручной эпизод
 
 ```bash

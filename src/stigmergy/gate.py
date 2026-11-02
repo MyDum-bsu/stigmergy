@@ -68,7 +68,7 @@ class GateResult:
 def _ls_tree(repo: Path, rev: str, paths: list[str]) -> list[tuple[str, str]]:
     if not paths:
         return []
-    proc = git(repo, "ls-tree", "-r", rev, "--", *paths, check=False)
+    proc = git(repo, "-c", "core.quotepath=false", "ls-tree", "-r", rev, "--", *paths, check=False)
     if proc.returncode != 0:
         raise GateError(proc.stderr.strip())
     out: list[tuple[str, str]] = []
@@ -179,7 +179,18 @@ def _control(
     corpus_rel = spec.negative_corpus
     if not corpus_rel:
         return {"result": "absent", "cases": 0}
-    listing = git(config.root, "ls-tree", "-r", "--name-only", base, "--", corpus_rel, check=False)
+    listing = git(
+        config.root,
+        "-c",
+        "core.quotepath=false",
+        "ls-tree",
+        "-r",
+        "--name-only",
+        base,
+        "--",
+        corpus_rel,
+        check=False,
+    )
     if listing.returncode != 0:
         return {"result": "error", "cases": 0, "detail": f"corpus not in {base}: {corpus_rel}"}
     names = [line for line in listing.stdout.splitlines() if line.endswith(".patch")]
@@ -250,7 +261,7 @@ def diff_paths(repo: Path, base: str, commit: str) -> list[str]:
     if merge_base.returncode != 0:
         raise GateError(merge_base.stderr.strip())
     fork = merge_base.stdout.strip()
-    proc = git(repo, "diff", "--name-only", f"{fork}..{commit}", check=False)
+    proc = git(repo, "-c", "core.quotepath=false", "diff", "--name-only", f"{fork}..{commit}", check=False)
     if proc.returncode != 0:
         raise GateError(proc.stderr.strip())
     return [line for line in proc.stdout.splitlines() if line]

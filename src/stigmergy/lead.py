@@ -96,13 +96,14 @@ def start_lead(
             "created": False,
         }
     argv = None
-    from stigmergy import sandbox
+    from stigmergy import routing, sandbox
 
+    lead_args = routing.args(config, "lead", LEAD_AGENT_ARGS)
     if config.runner.get("sandbox", True) and sandbox.bwrap_available():
         argv = sandbox.lead_argv(
             config.root,
             str(config.runner.get("agent", "pi")),
-            LEAD_AGENT_ARGS,
+            lead_args,
         )
     created = herdr_app.create_tab(
         app,
@@ -111,7 +112,7 @@ def start_lead(
         config.root,
         "pi",
         lead_prompt(config, space_name),
-        agent_args=LEAD_AGENT_ARGS,
+        agent_args=lead_args,
         argv=argv,
     )
     terminal = str(created.get("terminal", ""))

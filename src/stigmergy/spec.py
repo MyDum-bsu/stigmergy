@@ -175,6 +175,16 @@ class Spec:
         return raw if isinstance(raw, dict) else {}
 
     @property
+    def properties(self) -> dict[str, Any]:
+        raw = self.meta.get("properties") or {}
+        return raw if isinstance(raw, dict) else {}
+
+    @property
+    def live_model(self) -> dict[str, Any]:
+        raw = self.meta.get("live_model") or {}
+        return raw if isinstance(raw, dict) else {}
+
+    @property
     def invariants(self) -> list[str]:
         raw = self.meta.get("invariants") or []
         return [str(item) for item in raw] if isinstance(raw, list) else []
@@ -226,6 +236,28 @@ class Spec:
             errors.append("negative_control.corpus is required for medium/high risk")
         if self.risk == "high" and not self.invariants:
             errors.append("invariants are required for high risk (formal invariants before code)")
+        for label, block in (("properties", self.properties), ("live_model", self.live_model)):
+            command = str(block.get("command") or "").strip()
+            if command and "\n" in command:
+                errors.append(f"{label}.command must be a single line")
+            for key in ("seeds", "timeout_seconds"):
+                if key not in block:
+                    continue
+                try:
+                    value = int(block[key])
+                except (TypeError, ValueError):
+                    errors.append(f"{label}.{key} must be an integer")
+                    continue
+                if value < 1 or value > (1000 if key == "seeds" else 3600):
+                    errors.append(f"{label}.{key} is outside the allowed range")
+        if self.risk == "high" and not (
+            str(self.properties.get("command") or "").strip()
+            or str(self.live_model.get("command") or "").strip()
+        ):
+            errors.append(
+                "high risk requires properties.command or live_model.command "
+                "(PBT/live-model before a merge)"
+            )
         if any(not skill for skill in self.skills):
             errors.append("skills must be non-empty paths")
         return errors

@@ -112,7 +112,66 @@ stg dash --port 8788 --open
 Читает только события и артефакты; ZCode sqlite и `bd` не используются.
 Реестр проектов — `~/.config/stigmergy/projects.toml`.
 
-## 8. Диагностика
+## 8. Свойства, live-model и high-risk
+
+Спека может добавить проверки, которые исполняет контур:
+
+```yaml
+properties:
+  command: "python3 -m pytest tests/property -q"
+  seeds: 32
+live_model:
+  command: "python3 tests/live_model.py"
+```
+
+`properties` запускается на каждом seed (`STG_SEED`) в одноразовом worktree;
+`live_model` — один раз с `STG_LIVE_MODEL=1`. Для `risk: high` нужен хотя бы
+один из блоков; гейт исполняет formal + critic + эти проверки и не мержит
+high-risk без human answer.
+
+```bash
+stg pbt <ID>                 # прогон вручную, вне гейта
+stg verify <ID>              # TLA+ core + per-task модель
+```
+
+## 9. Модели и бенчмарки
+
+Маршруты задаются в `.agent.toml`; ядро не угадывает модель:
+
+```toml
+[models]
+default = "provider/base"
+worker = "provider/fast"
+planner = "provider/reasoning"
+critic = "provider/other"
+lead = "provider/reasoning"
+bench_command = "my-model-cli --model {model} --prompt-file {prompt_file}"
+```
+
+```bash
+stg model list
+stg model route --stage worker
+stg model bench --cases evals/cases.jsonl --model provider/fast
+```
+
+Бенчмарк-команда получает `STG_MODEL`, `STG_PROMPT_FILE`, `STG_EXPECTED`;
+`expected` из JSONL проверяется как подстрока. Отчёт пишется в
+`.factory/benchmarks/`.
+
+## 10. Регулярные задания
+
+```bash
+stg schedule install --enable
+stg schedule status
+```
+
+`stigmergy-learn.timer` — еженедельный `stg learn --days 7`;
+`stigmergy-persona.timer` — ежедневный ingest
+`.factory/persona/inbox.jsonl` (формат JSONL: `question`, `decision`, `quote`,
+`source`, `date`). Повторный ingest идемпотентен; digest —
+`persona/<date>.md`.
+
+## 11. Диагностика
 
 | Симптом | Что проверить |
 |---|---|
@@ -124,7 +183,7 @@ stg dash --port 8788 --open
 | `GoUsageLimitError` | квота провайдера; эпизод падает, не мержится |
 | `database is locked` (board) | второй писатель; `flock` ждёт, проверь долгий процесс |
 
-## 9. Безопасность
+## 12. Безопасность
 
 - `main` не пишется фабрикой; мерж только в `base` (`dev`), fast-forward.
 - `data/`, `tracker/data/`, `$HOME`, SSH и креды не видны в episode/gate.

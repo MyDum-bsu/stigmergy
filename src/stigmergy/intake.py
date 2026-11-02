@@ -221,14 +221,15 @@ def create_task(
             space = herdr_app.ensure_space(app, space_name, config.root)
             space_id = str(space.get("space") or space.get("id") or "")
             argv = None
-            from stigmergy import sandbox
+            from stigmergy import routing, sandbox
 
+            planner_args = routing.args(config, "planner", PLANNER_TOOLS)
             if config.runner.get("sandbox", True) and sandbox.bwrap_available():
                 argv = sandbox.planner_argv(
                     paths["root"],
                     config.root,
                     str(config.runner.get("agent", "pi")),
-                    PLANNER_TOOLS,
+                    planner_args,
                 )
             tab = herdr_app.create_tab(
                 app,
@@ -237,7 +238,7 @@ def create_task(
                 paths["root"],
                 str(config.runner.get("agent", "pi")),
                 planner_prompt(config, task_id, paths),
-                agent_args=PLANNER_TOOLS,
+                agent_args=planner_args,
                 argv=argv,
             )
             planner = {

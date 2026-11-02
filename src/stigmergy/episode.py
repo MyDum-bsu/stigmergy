@@ -152,11 +152,12 @@ def start_episode(
     prompt = build_prompt(task, spec, wt.path, agent=agent, board_root=config.root)
     handle = None
     if runner == "herdr-app":
+        from stigmergy import routing
         from stigmergy.runner.herdr_app import HerdrAppRunner
 
         space = space or str(config.runner.get("space", "") or "") or None
         tab_name = tab_name or (f"{task.id} · {task.title}".strip(" ·") if task.title else task.id)
-        agent_args = ["--exclude-tools", "AskUserQuestion"]
+        agent_args = routing.args(config, "worker", ["--exclude-tools", "AskUserQuestion"])
         for skill in spec.skills:
             agent_args.extend(["--skill", skill])
         worker_argv = None

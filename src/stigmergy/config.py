@@ -23,9 +23,20 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "agent": "pi",
         "sandbox": True,
         "keep_workspace": True,
+        "model": "",
+        "critic_model": "",
     },
     "risk": {"low": "auto", "medium": "auto", "high": "human"},
     "dispatcher": {"auto_finish": True, "interval_seconds": 5, "max_retries": 1, "auto_judge": True},
+    "models": {
+        "default": "",
+        "worker": "",
+        "planner": "",
+        "critic": "",
+        "lead": "",
+        "judge": "",
+        "bench_command": "",
+    },
 }
 
 
@@ -122,6 +133,14 @@ gate_network = "none"
 [runner]
 kind = "manual"
 agent = "pi"
+
+[models]
+default = ""
+worker = ""
+planner = ""
+critic = ""
+lead = ""
+bench_command = ""
 
 [risk]
 low = "auto"

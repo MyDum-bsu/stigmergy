@@ -531,6 +531,82 @@ def cmd_learn(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_persona(args: argparse.Namespace) -> int:
+    _root, config, _board = _ctx(args)
+    from stigmergy import persona
+
+    data = persona.ingest(config, Path(args.file))
+    _emit(
+        args,
+        data,
+        f"persona: imported={data['imported']} skipped={data['skipped']} errors={data['errors']}\n"
+        f"{data.get('digest', '')}",
+    )
+    return 0 if data["ok"] else 1
+
+
+def cmd_schedule(args: argparse.Namespace) -> int:
+    _root, config, _board = _ctx(args)
+    from stigmergy import schedule
+
+    if args.schedule_cmd == "status":
+        data = schedule.status()
+    else:
+        data = schedule.install(
+            config,
+            enable=args.enable,
+            learn_calendar=args.learn_calendar,
+            persona_calendar=args.persona_calendar,
+        )
+    _emit(args, data, json.dumps(data, ensure_ascii=False, indent=2))
+    return 0 if data.get("ok") else 1
+
+
+def cmd_model(args: argparse.Namespace) -> int:
+    _root, config, _board = _ctx(args)
+    from stigmergy import bench, routing
+
+    if args.model_cmd == "route":
+        model = routing.choose(config, args.stage)
+        _emit(args, {"stage": args.stage, "model": model}, model or "default")
+        return 0
+    if args.model_cmd == "list":
+        data = routing.table(config)
+        _emit(args, data, json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    data = bench.evaluate(
+        config,
+        Path(args.cases),
+        args.model,
+        command=args.command,
+        timeout=args.timeout,
+    )
+    _emit(args, data, bench.text(data))
+    return 0 if data["ok"] else 1
+
+
+def cmd_pbt(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from stigmergy import properties
+    from stigmergy.spec import load_for
+    from stigmergy.workspace import rev_parse
+
+    state = _state(board, config)
+    task = state.task(args.id)
+    spec = load_for(config.root, task.base or config.base, task.spec)
+    commit = task.commit
+    if not commit:
+        commit = rev_parse(config.workspace_root / f"{task.id}-{task.sha}", "HEAD")
+    data = properties.run(
+        config,
+        spec,
+        commit,
+        use_sandbox=not args.no_sandbox,
+    )
+    _emit(args, data, properties.text(data))
+    return 0 if data["ok"] and not data.get("skipped") else 1
+
+
 def cmd_feed(args: argparse.Namespace) -> int:
     _root, config, board = _ctx(args)
     from pathlib import Path
@@ -1280,6 +1356,41 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("learn", help="weekly learning proposals")
     p.add_argument("--days", type=int, default=7)
     p.set_defaults(func=cmd_learn)
+
+    p = sub.add_parser("persona", help="nightly cited-decision ingest")
+    pe = p.add_subparsers(dest="persona_cmd", required=True)
+    q = pe.add_parser("ingest")
+    q.add_argument("--file", required=True)
+    q.set_defaults(func=cmd_persona)
+
+    p = sub.add_parser("schedule", help="weekly/nightly systemd timers")
+    sc = p.add_subparsers(dest="schedule_cmd", required=True)
+    q = sc.add_parser("install")
+    q.add_argument("--enable", action="store_true")
+    q.add_argument("--learn-calendar", default="Mon 09:00")
+    q.add_argument("--persona-calendar", default="03:30")
+    q.set_defaults(func=cmd_schedule)
+    q = sc.add_parser("status")
+    q.set_defaults(func=cmd_schedule)
+
+    p = sub.add_parser("model", help="stage routing and model benchmarks")
+    mo = p.add_subparsers(dest="model_cmd", required=True)
+    q = mo.add_parser("route")
+    q.add_argument("--stage", required=True, choices=["worker", "planner", "critic", "lead", "judge"])
+    q.set_defaults(func=cmd_model)
+    q = mo.add_parser("list")
+    q.set_defaults(func=cmd_model)
+    q = mo.add_parser("bench")
+    q.add_argument("--cases", required=True)
+    q.add_argument("--model", required=True)
+    q.add_argument("--command")
+    q.add_argument("--timeout", type=int, default=120)
+    q.set_defaults(func=cmd_model)
+
+    p = sub.add_parser("pbt", help="property seeds + live-model check")
+    p.add_argument("id")
+    p.add_argument("--no-sandbox", action="store_true")
+    p.set_defaults(func=cmd_pbt)
 
     p = sub.add_parser("feed", help="proactive JSONL inbox")
     p.add_argument("--file", required=True)

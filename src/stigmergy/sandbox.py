@@ -63,20 +63,6 @@ def gate_argv(
     return argv
 
 
-def episode_argv(
-    worktree: Path,
-    repo_git_dir: Path | None,
-    command: list[str],
-    env: dict[str, str],
-    home: Path,
-) -> list[str]:
-    argv = _common(worktree, home, env)
-    if repo_git_dir and repo_git_dir.exists():
-        argv.extend(["--ro-bind", str(repo_git_dir), str(repo_git_dir)])
-    argv.extend(["--", *command])
-    return argv
-
-
 def _aa_profile() -> str:
     """Herdr terminals are AppArmor 'unconfined'; userns needs the zcode profile.
 

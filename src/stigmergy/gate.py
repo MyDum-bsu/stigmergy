@@ -40,6 +40,7 @@ class GateResult:
     stdout: str = ""
     stderr: str = ""
     formal: dict[str, Any] | None = None
+    properties: dict[str, Any] | None = None
     passed: bool = False
 
     def as_dict(self) -> dict[str, Any]:
@@ -59,6 +60,7 @@ class GateResult:
             "stdout_sha256": hashlib.sha256(self.stdout.encode()).hexdigest(),
             "stderr_sha256": hashlib.sha256(self.stderr.encode()).hexdigest(),
             "formal": self.formal,
+            "properties": self.properties,
             "passed": self.passed,
         }
 
@@ -373,7 +375,9 @@ def run_gate(
             or (spec.risk == "low" and control["result"] == "absent")
         )
         formal = None
+        pbt = None
         if spec.risk == "high":
+            from stigmergy import properties as property_checks
             from stigmergy.formal import verify_core, verify_task
 
             core = verify_core(config)
@@ -381,12 +385,15 @@ def run_gate(
             from stigmergy.critic import evaluate as critic_evaluate
 
             critic = critic_evaluate(config, spec.id)
+            pbt = property_checks.run(config, spec, commit, use_sandbox=use_sandbox)
             formal = {"core": core, "task": task_formal, "critic": critic}
             passed = (
                 passed
                 and bool(core.get("passed"))
                 and bool(task_formal.get("ok"))
                 and bool(critic.get("ok"))
+                and bool(pbt.get("ok"))
+                and not bool(pbt.get("skipped"))
             )
         result = GateResult(
             task=spec.id,
@@ -403,6 +410,7 @@ def run_gate(
             stdout=stdout,
             stderr=stderr,
             formal=formal,
+            properties=pbt,
             passed=passed,
         )
         (artifact_dir / "gate.json").write_text(

@@ -134,7 +134,9 @@ def start_critic(
     space = herdr_app.ensure_space(app, space_name, config.root)
     space_id = str(space.get("space") or space.get("id") or "")
     args = list(DEFAULT_CRITIC_ARGS)
-    model = str(config.runner.get("critic_model", "") or "")
+    from stigmergy import routing
+
+    model = routing.choose(config, "critic")
     if model:
         args += ["--model", model]
     created = herdr_app.create_tab(

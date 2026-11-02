@@ -96,3 +96,59 @@ def test_sandbox_glitch_detector() -> None:
 
     assert _sandbox_glitch("bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted")
     assert not _sandbox_glitch("assert 1 == 2")
+
+
+def test_high_risk_gate_runs_formal_critic_and_pbt(repo: Path) -> None:
+    import json
+    import shutil
+
+    from stigmergy import critic, formal
+
+    config = Config.load(repo)
+    if shutil.which("java") is None or formal.jar_path(config) is None:
+        import pytest
+
+        pytest.skip("java/tla2tools.jar not installed")
+    model = Path(__file__).resolve().parents[1] / "src" / "stigmergy" / "formal"
+    spec = Spec.from_text(
+        f"""---
+id: HR
+risk: high
+allowed_paths:
+  - src.txt
+  - work.txt
+oracle_paths:
+  - test_gate.py
+gate_inputs: []
+invariants:
+  - done implies gate
+formal:
+  model: {model / 'TaskLifecycle.tla'}
+  config: {model / 'TaskLifecycle.cfg'}
+  mutant_model: {model / 'TaskLifecycleBroken.tla'}
+  mutant_cfg: {model / 'TaskLifecycleBroken.cfg'}
+properties:
+  command: "true"
+  seeds: 2
+live_model:
+  command: "true"
+dod: python3 test_gate.py
+negative_control:
+  corpus: oracle/negative/T1/
+---
+high risk
+""",
+        "specs/HR.md",
+    )
+    assert not spec.validate(), spec.validate()
+    report = critic.report_path(config, "HR")
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(json.dumps({"findings": []}), encoding="utf-8")
+    head = make_task_branch(repo, "task/HR", {"work.txt": "work\n"})
+    result = run_gate(config, spec, head, "dev", "hr1", use_sandbox=False)
+    assert result.passed, (result.stderr, result.formal, result.properties)
+    assert result.formal["critic"]["ok"]
+    assert result.formal["task"]["ok"]
+    assert result.formal["core"]["passed"]
+    assert result.properties["properties"]["seeds"] == 2
+    assert result.properties["live_model"]["ok"]

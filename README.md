@@ -34,6 +34,12 @@ stg judge eval
 stg judge import --file decisions/nightly.jsonl
 stg usage add --task <ID> --stage check --prompt-tokens 100
 stg learn --days 7
+stg persona ingest --file .factory/persona/inbox.jsonl
+stg schedule install --enable            # weekly learn + nightly persona timers
+stg model list                           # stage → model routing
+stg model route --stage worker
+stg model bench --cases evals/cases.jsonl --model <model>
+stg pbt <ID>                             # property seeds + live-model probe
 stg feed --file .factory/inbox.jsonl
 stg mutation <ID>
 stg mirror github
@@ -57,20 +63,25 @@ stg critique <ID>                       # независимый critic, дру�
 - `stg lead` — человек говорит только с lead-вкладкой; worker'ы блокируются
   через `stg board block`, без AskUserQuestion.
 
-## Состояние (2026-11-01)
+## Состояние (2026-11-02)
 
-Реализованы S0–S7, P0 dark factory и M1 trust baseline (human token, watchdog, sandbox planner/lead): intake, plan approval + HTML artifact,
-dispatcher, lead-канал, judge/decisions, metrics/audit, weekly retro, critic
-tab, source idempotency. Formal TLA+/TLC, auto-judge, enforced critic,
-proactive watchers, Telegram/GitHub and cost telemetry — следующие слои.
+Реализованы S0–S7, P0 dark factory, M1 trust baseline и M2–M5:
+intake, plan approval + HTML artifact, dispatcher, lead-канал, judge/decisions,
+metrics/audit, formal TLA+/TLC (core + per-task mutant), auto-judge, enforced
+critic, PBT/live-model checks, usage/cost, feed, plan UI, mirror adapter,
+stage routing and a benchmark harness. Weekly learn and nightly persona are
+installed as user systemd timers on this machine.
 
 Проверено в этом окружении:
 
-- `uv run pytest -q` — 95 passed; `uv run ruff check .` — clean.
+- `uv run pytest -q` — 104 passed; `uv run ruff check .` — clean.
 - T5 end-to-end на клоне `optimization`: `stg run T5-land --runner noop --auto
   --no-sandbox` → `gate.passed`, `control.proven`, `integration.passed`,
   `merge.done`; `dev` fast-forward на `a9f57f6`, `.beads` не в дереве,
   bd-блока в `AGENTS.md` нет.
+- High-risk live fixture: `formal` core/task PASS, mutant rejected, critic
+  report clean, properties 3/3 seeds, live-model PASS, negative control
+  proven; задача остановлена на `task.blocked` «High-risk merge HR».
 - `stg sandbox check` — bwrap-канарейка `ok`.
 - Herdr: systemd-сессия `factory` запущена; `pi` с ключом OpenCode Go 3
   (`opencode-go-chat-3`) прошёл реальные эпизоды `S8a` (конфиг + скилл) и
@@ -81,9 +92,12 @@ proactive watchers, Telegram/GitHub and cost telemetry — следующие с
   `main` не тронут (`069c3af`).
 - `stg migrate --check /home/mydum/src/optimization/.agent` — 292 события,
   105 задач, схема валидна.
+- timers: `stigmergy-learn.timer` → Mon 09:00, `stigmergy-persona.timer` →
+  03:30 daily; both `active`.
 
-Не проверено: реальный T5-мерж в `optimization/dev` и переписывание
-`AGENTS.md` на `stg` — ждут явного go-ahead.
+Не проверено: Telegram/cloud/computer-use adapters, real GitHub issue apply,
+PBT corpus на реальном коде `optimization` (harness и live fixture проверены),
+и promotion `main` — ждут явного go-ahead владельца.
 
 ## Быстрый старт
 

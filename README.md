@@ -16,14 +16,41 @@
   диагностика.
 - [`docs/migration.md`](docs/migration.md) — Big Bang-перенос доски.
 
+## P0: идея → принятая задача
+
+```bash
+stg task "добавить HQ-сканы в трекер"   # request + task + Plan tab
+stg plan list
+stg plan show <ID>
+stg plan approve <ID>                   # commit spec в dev + attach к task
+stg dispatcher --once                   # один тик
+stg dispatcher --watch                  # демон: старт/финиш/уведомления
+stg judge search "куда деплоить"
+stg judge add "куда деплоить?" --decision "только через поезд" \
+  --quote "не выкатываем без гейта" --source decisions/runbook.md
+```
+
+Инварианты P0:
+
+- `stg task` не создаёт ветку/воркtree — только request, доску и Plan-вкладку.
+- `stg plan approve` — единственный человеческий шаг: спеку валидирует и
+  коммитит в `dev` worktree, задача становится runnable.
+- `dispatcher` — детерминированный цикл, не LLM: стартует задачи со спекой,
+  финишит заснувшего worker'а, пишет lead'у про `task.blocked`, соблюдает WIP.
+- `stg judge` не выдумывает: ищет решения с цитатой/источником/датой; пусто —
+  эскалация человеку.
+- `stg lead` — человек говорит только с lead-вкладкой; worker'ы блокируются
+  через `stg board block`, без AskUserQuestion.
+
 ## Состояние (2026-11-01)
 
-Реализованы S0–S7; S8 подготовлен, реальный перенос `.agent` ждёт явного
-go-ahead.
+Реализованы S0–S7 и P0 dark factory: intake, plan approval, dispatcher,
+lead-канал, judge/decisions. P1/P2 (formal invariants, weekly learning,
+plan artifact, proactivity) — следующие слои.
 
 Проверено в этом окружении:
 
-- `uv run pytest -q` — 28 passed; `uv run ruff check .` — clean.
+- `uv run pytest -q` — 53 passed; `uv run ruff check .` — clean.
 - T5 end-to-end на клоне `optimization`: `stg run T5-land --runner noop --auto
   --no-sandbox` → `gate.passed`, `control.proven`, `integration.passed`,
   `merge.done`; `dev` fast-forward на `a9f57f6`, `.beads` не в дереве,

@@ -7,6 +7,7 @@ source/date; the lead answers from them, and "new" still goes to the human.
 from __future__ import annotations
 
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -58,6 +59,44 @@ def decisions(config: Config) -> list[dict[str, Any]]:
             except (OSError, SpecError):
                 continue
     return out
+
+
+
+
+def add(
+    config: Config,
+    question: str,
+    decision: str,
+    *,
+    quote: str = "",
+    source: str = "",
+    date: str | None = None,
+    scope: str = "project",
+) -> dict[str, Any]:
+    """Record a human decision in the base the judge reads."""
+    question = question.strip()
+    decision = decision.strip()
+    if not question or not decision:
+        raise ValueError("question and decision are required")
+    root = config.integration_root / "decisions"
+    if not config.integration_root.exists():
+        root = config.root / "decisions"
+    root.mkdir(parents=True, exist_ok=True)
+    slug = re.sub(r"[^a-z0-9а-яё]+", "-", question.lower(), flags=re.IGNORECASE).strip("-")
+    path = root / f"dec-{time.strftime('%Y%m%d-%H%M%S')}-{slug[:32] or 'decision'}.md"
+    path.write_text(
+        "---\n"
+        f"id: {path.stem}\n"
+        f"date: {date or time.strftime('%Y-%m-%d')}\n"
+        f"scope: {scope}\n"
+        f"question: {question}\n"
+        f"decision: {decision}\n"
+        f"quote: {quote}\n"
+        f"source: {source or path.name}\n"
+        "---\n",
+        encoding="utf-8",
+    )
+    return parse_decision(path)
 
 
 def _tokens(text: str) -> set[str]:

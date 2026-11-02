@@ -226,6 +226,23 @@ def cleanup(app: str = DEFAULT_APP, task: str | None = None) -> list[str]:
     return closed
 
 
+def send_paused(handle: str, text: str) -> tuple[bool, str]:
+    """Type into a terminal only when its agent is not working.
+
+    ``done`` is a normal pi state after a turn; ``hc send --if idle`` rejects
+    it, so check the state ourselves and then send without the filter.
+    """
+    try:
+        data = get(handle)
+    except Exception as exc:
+        return False, str(exc)[:300]
+    state = str((data.get("status") or {}).get("state") or "")
+    if state == "working":
+        return False, "agent is working"
+    code, out = hc("send", handle, text)
+    return code == 0, out[:300]
+
+
 def wait_until_settled(terminal: str, deadline_s: int = 1800) -> str:
     """Wait for the agent's first turn to finish.
 

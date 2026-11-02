@@ -43,3 +43,18 @@ def test_no_match_is_explicit(repo: Path) -> None:
     config = Config.load(repo)
     assert judge.search(config, "совершенно другой вопрос") == []
     assert "нет" in judge.answer_text([])
+
+
+def test_add_decision_roundtrip(repo: Path) -> None:
+    config = Config.load(repo)
+    item = judge.add(
+        config,
+        "Можно ли пушить в main?",
+        "Только человек, фабрика не пишет main",
+        quote="main не пишется фабрикой",
+        source="AGENTS.md",
+        date="2026-11-02",
+    )
+    assert Path(item["path"]).exists()
+    found = judge.search(config, "пушить main")
+    assert found and found[0]["decision"] == "Только человек, фабрика не пишет main"

@@ -509,6 +509,18 @@ def cmd_judge(args: argparse.Namespace) -> int:
         lines = [f"{item['id']}\t{item['date']}\t{item['question']}" for item in items]
         _emit(args, items, "\n".join(lines) or "no decisions")
         return 0
+    if args.judge_cmd == "add":
+        item = judge.add(
+            config,
+            args.question,
+            args.decision,
+            quote=args.quote or "",
+            source=args.source or "",
+            date=args.date,
+            scope=args.scope,
+        )
+        _emit(args, item, f"decision {item['id']} -> {item['path']}")
+        return 0
     items = judge.search(config, " ".join(args.query), limit=args.limit)
     _emit(args, items, judge.answer_text(items))
     return 0
@@ -934,6 +946,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("judge", help="decision base with citations")
     j = p.add_subparsers(dest="judge_cmd", required=True)
     q = j.add_parser("list")
+    q.set_defaults(func=cmd_judge)
+    q = j.add_parser("add")
+    q.add_argument("question")
+    q.add_argument("--decision", required=True)
+    q.add_argument("--quote", default="")
+    q.add_argument("--source", default="")
+    q.add_argument("--date")
+    q.add_argument("--scope", default="project")
     q.set_defaults(func=cmd_judge)
     q = j.add_parser("search")
     q.add_argument("query", nargs="+")

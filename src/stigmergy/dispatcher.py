@@ -79,9 +79,12 @@ def notify_lead(
     handle = lead_handle(board)
     if not handle:
         return {"task": task_id, "sent": False, "detail": "lead tab is not running"}
-    send = hc or herdr_app.hc
-    code, out = send("send", handle, message, "--if", "idle")
-    return {"task": task_id, "sent": code == 0, "detail": out[:300], "lead": handle}
+    if hc is None:
+        sent, detail = herdr_app.send_paused(handle, message)
+    else:
+        code, out = hc("send", handle, message, "--if", "idle")
+        sent, detail = code == 0, out[:300]
+    return {"task": task_id, "sent": sent, "detail": detail, "lead": handle}
 
 
 def _finish(config: Config, task_id: str) -> dict[str, Any]:

@@ -50,7 +50,11 @@ def test_inbox_and_answer_resume_worker(repo: Path, monkeypatch) -> None:
     )
     board_mod.block(board, config, "T1", "pi", "which branch?")
     calls = []
-    monkeypatch.setattr(lead.herdr_app, "hc", lambda *args: (calls.append(args) or (0, "sent")))
+    monkeypatch.setattr(
+        lead.herdr_app,
+        "send_paused",
+        lambda handle, text: (calls.append(("send", handle, text)) or (True, "sent")),
+    )
     items = lead.inbox(board, config)
     assert len(items) == 1
     assert items[0]["id"] == "T1"
@@ -60,7 +64,7 @@ def test_inbox_and_answer_resume_worker(repo: Path, monkeypatch) -> None:
     assert items[0]["terminal"] == "t1"
     data = lead.answer(config, board, "T1", "use dev")
     assert data["sent"] is True
-    assert calls[0][:3] == ("send", "t1", "Лид: use dev\n\nПродолжай работу по спеке.")
+    assert calls[0] == ("send", "t1", "Лид: use dev\n\nПродолжай работу по спеке.")
     assert _state(board).task("T1").status == "queued"
 
 

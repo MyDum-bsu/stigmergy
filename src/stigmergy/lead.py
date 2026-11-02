@@ -171,15 +171,10 @@ def answer(
     sent = False
     detail = ""
     if terminal:
-        code, out = herdr_app.hc(
-            "send",
+        sent, detail = herdr_app.send_paused(
             terminal,
             f"Лид: {text}\n\nПродолжай работу по спеке.",
-            "--if",
-            "idle",
         )
-        sent = code == 0
-        detail = out[:300]
     return {
         "task": task_id,
         "answer": text,

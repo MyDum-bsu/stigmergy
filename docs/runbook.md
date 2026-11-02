@@ -47,6 +47,7 @@ stg spec validate specs/T1.md --base dev
 ```toml
 [factory]
 auto_approve = true
+autonomy = "yolo"       # fast | yolo; high risk is always human
 fast_max_paths = 1
 fast_max_oracle = 2
 fast_max_dod_chars = 1200
@@ -59,7 +60,9 @@ stg plan auto <ID>       # policy approval without human token
 ```
 
 Fast lane разрешает только `risk: low`, ровно один `allowed_paths`, 1–2
-`oracle_paths`, короткий `dod` и `auto_approve: true` в спеке. Запрещены
+`oracle_paths`, короткий `dod` и `auto_approve: true` в спеке. Режим
+`autonomy = "yolo"` расширяет policy-approve на `medium`: до 20 файлов,
+negative control обязателен, high risk всё равно требует человека. Запрещены
 `data/`, `.git`, секреты, `rm -rf`, `git push`, сеть, `sudo`, `systemctl`.
 Dispatcher сам делает policy-approve и пишет `plan.approved` с
 `approval.mode=policy`; gate и merge остаются обязательными. Всё, что не

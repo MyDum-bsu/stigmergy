@@ -31,6 +31,7 @@ DEFAULTS: dict[str, dict[str, Any]] = {
     "dispatcher": {"auto_finish": True, "interval_seconds": 5, "max_retries": 1, "auto_judge": True},
     "factory": {
         "auto_approve": False,
+        "autonomy": "fast",
         "fast_max_paths": 1,
         "fast_max_oracle": 2,
         "fast_max_dod_chars": 1200,
@@ -156,6 +157,7 @@ space = "{name}"
 
 [factory]
 auto_approve = false
+autonomy = "fast"
 fast_max_paths = 1
 fast_max_oracle = 2
 fast_max_dod_chars = 1200

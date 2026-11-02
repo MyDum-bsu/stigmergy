@@ -24,6 +24,7 @@ agent = "pi"
 space = "stigmergy"
 
 [factory]
+autonomy = "yolo"
 auto_approve = true
 
 [dispatcher]

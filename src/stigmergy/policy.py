@@ -39,37 +39,63 @@ def _count(paths: list[str]) -> int:
 
 def evaluate(config: Config, spec: Spec) -> dict[str, Any]:
     settings = config.section("factory")
+    mode = str(settings.get("autonomy") or "fast").lower()
     reasons: list[str] = []
+    policy_name = POLICY
     if not bool(settings.get("auto_approve")):
-        reasons.append("fast lane disabled: [factory].auto_approve=false")
-    if spec.risk != "low":
-        reasons.append(f"risk is {spec.risk}, fast lane is low only")
-    if not spec.auto_approve:
-        reasons.append("spec does not declare auto_approve: true")
-    max_paths = int(settings.get("fast_max_paths", 1) or 1)
-    max_oracle = int(settings.get("fast_max_oracle", 2) or 2)
-    if _count(spec.allowed_paths) != max_paths:
-        reasons.append(f"allowed_paths must be exactly {max_paths}")
-    if _count(spec.oracle_paths) < 1 or _count(spec.oracle_paths) > max_oracle:
-        reasons.append(f"oracle_paths must be 1..{max_oracle}")
-    if len(spec.dod) > int(settings.get("fast_max_dod_chars", 1200) or 1200):
-        reasons.append("dod is too long for fast lane")
-    for path in spec.allowed_paths:
-        if path in {"*", "**", "/**"} or "**" in path:
-            reasons.append(f"broad path is not fast-lane safe: {path}")
-        for pattern in FORBIDDEN_PATHS:
-            if re.search(pattern, path, re.IGNORECASE):
-                reasons.append(f"protected path: {path}")
-    for pattern in FORBIDDEN_COMMANDS:
-        if re.search(pattern, spec.dod, re.IGNORECASE):
-            reasons.append(f"dod contains forbidden operation: {pattern}")
-    if spec.invariants and spec.risk != "high":
-        reasons.append("invariants are for high-risk formal tasks")
-    if spec.negative_corpus:
-        reasons.append("negative_control is for normal lane; fast lane has no negative corpus")
+        reasons.append("auto approval disabled: [factory].auto_approve=false")
+    if spec.risk == "high":
+        reasons.append("high risk always requires a human")
+    if mode not in {"fast", "yolo"}:
+        reasons.append(f"unknown autonomy mode: {mode}")
+    if mode == "yolo" and spec.risk in {"low", "medium"}:
+        policy_name = "auto-medium-v1"
+        max_paths = int(settings.get("yolo_max_paths", 20) or 20)
+        max_oracle = int(settings.get("yolo_max_oracle", 5) or 5)
+        if _count(spec.allowed_paths) < 1 or _count(spec.allowed_paths) > max_paths:
+            reasons.append(f"allowed_paths must be 1..{max_paths} in yolo mode")
+        if _count(spec.oracle_paths) < 1 or _count(spec.oracle_paths) > max_oracle:
+            reasons.append(f"oracle_paths must be 1..{max_oracle} in yolo mode")
+        if spec.risk == "medium" and not spec.negative_corpus:
+            reasons.append("medium risk needs negative_control in yolo mode")
+        for path in spec.allowed_paths:
+            if path in {"*", "**", "/**"}:
+                reasons.append(f"broad path is not safe: {path}")
+            for pattern in FORBIDDEN_PATHS:
+                if re.search(pattern, path, re.IGNORECASE):
+                    reasons.append(f"protected path: {path}")
+        for pattern in FORBIDDEN_COMMANDS:
+            if re.search(pattern, spec.dod, re.IGNORECASE):
+                reasons.append(f"dod contains forbidden operation: {pattern}")
+    elif mode == "fast":
+        if spec.risk != "low":
+            reasons.append(f"risk is {spec.risk}, fast lane is low only")
+        if not spec.auto_approve:
+            reasons.append("spec does not declare auto_approve: true")
+        max_paths = int(settings.get("fast_max_paths", 1) or 1)
+        max_oracle = int(settings.get("fast_max_oracle", 2) or 2)
+        if _count(spec.allowed_paths) != max_paths:
+            reasons.append(f"allowed_paths must be exactly {max_paths}")
+        if _count(spec.oracle_paths) < 1 or _count(spec.oracle_paths) > max_oracle:
+            reasons.append(f"oracle_paths must be 1..{max_oracle}")
+        if len(spec.dod) > int(settings.get("fast_max_dod_chars", 1200) or 1200):
+            reasons.append("dod is too long for fast lane")
+        for path in spec.allowed_paths:
+            if path in {"*", "**", "/**"} or "**" in path:
+                reasons.append(f"broad path is not fast-lane safe: {path}")
+            for pattern in FORBIDDEN_PATHS:
+                if re.search(pattern, path, re.IGNORECASE):
+                    reasons.append(f"protected path: {path}")
+        for pattern in FORBIDDEN_COMMANDS:
+            if re.search(pattern, spec.dod, re.IGNORECASE):
+                reasons.append(f"dod contains forbidden operation: {pattern}")
+        if spec.invariants:
+            reasons.append("invariants are for high-risk formal tasks")
+        if spec.negative_corpus:
+            reasons.append("negative_control is for normal lane; fast lane has no negative corpus")
     return {
         "ok": not reasons,
-        "policy": POLICY,
+        "policy": policy_name,
         "reasons": reasons,
         "spec_sha": spec.sha,
         "risk": spec.risk,

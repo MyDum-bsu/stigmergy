@@ -73,3 +73,33 @@ def test_preflight_rejects_missing_oracle(repo: Path) -> None:
     assert not preflight["ok"]
     assert any("oracle path" in error for error in preflight["errors"])
     assert not intake.auto_approve_plan(config, board, task_id)["ok"]
+
+
+def test_yolo_accepts_medium_but_never_high(repo: Path) -> None:
+    from stigmergy.spec import Spec
+
+    config = Config.load(repo)
+    config.raw["factory"] = {"auto_approve": True, "autonomy": "yolo"}
+    text = """---
+id: M1
+risk: medium
+allowed_paths:
+  - src/a.py
+  - tests/a.py
+oracle_paths:
+  - test_gate.py
+gate_inputs: []
+dod: python3 test_gate.py
+negative_control:
+  corpus: oracle/negative/M1/
+---
+medium
+"""
+    medium = Spec.from_text(text, "specs/M1.md")
+    data = policy.evaluate(config, medium)
+    assert data["ok"] and data["policy"] == "auto-medium-v1"
+    high_text = text.replace("risk: medium", "risk: high").replace(
+        "oracle_paths:", "invariants:\n  - gate before done\noracle_paths:"
+    )
+    high = Spec.from_text(high_text, "specs/M1.md")
+    assert not policy.evaluate(config, high)["ok"]

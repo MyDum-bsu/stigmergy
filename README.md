@@ -30,6 +30,7 @@ stg plan preflight <ID>                # oracle/corpus проверка до app
 stg plan render <ID>                    # HTML-артефакт плана
 stg plan approve <ID>                   # human: commit spec в dev + attach
 stg plan auto <ID>                      # policy fast lane, no token
+# [factory] autonomy = "yolo": low+medium auto, high always human
 stg verify                              # TLA+ lifecycle model + live invariants
 stg dispatcher --once                   # один тик
 stg dispatcher --watch                  # демон: старт/финиш/уведомления
@@ -90,7 +91,7 @@ installed as user systemd timers on this machine.
 
 Проверено в этом окружении:
 
-- `uv run pytest -q` — 143 passed; `uv run ruff check .` — clean.
+- `uv run pytest -q` — 144 passed; `uv run ruff check .` — clean.
 - T5 end-to-end на клоне `optimization`: `stg run T5-land --runner noop --auto
   --no-sandbox` → `gate.passed`, `control.proven`, `integration.passed`,
   `merge.done`; `dev` fast-forward на `a9f57f6`, `.beads` не в дереве,

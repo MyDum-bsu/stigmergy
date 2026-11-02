@@ -48,6 +48,7 @@ space = "{space}"
 
 [factory]
 auto_approve = true
+autonomy = "yolo"
 
 [risk]
 low = "auto"
@@ -60,7 +61,7 @@ high = "human"
     if "[runner]" in text and "space =" not in text.split("[runner]", 1)[1].split("[", 1)[0]:
         text = text.replace("[runner]\n", f'[runner]\nspace = "{space}"\n', 1)
     if "[factory]" not in text:
-        text = text.rstrip() + "\n\n[factory]\nauto_approve = true\n"
+        text = text.rstrip() + "\n\n[factory]\nauto_approve = true\nautonomy = \"yolo\"\n"
     path.write_text(text, encoding="utf-8")
 
 

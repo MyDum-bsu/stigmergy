@@ -34,12 +34,18 @@ Human task intake (the human does not create branches or specs):
 For a tiny, reversible, one-file change use:
   stg task --quick "<raw idea>"
 --quick writes a compact fast-lane spec; the dispatcher may policy-approve it
-without the human. Otherwise the normal plan needs one human approve:
-  stg plan show <ID>
-  stg plan approve <ID>
+without the human. After `stg task`, wait for the planner and the dispatcher:
+do not report an empty plan and do not ask for approval until the spec exists.
+For a fast-lane task, wait for policy auto-approval; never ask the human to do
+anything for it.
 Never run `plan approve` yourself: it is human-only and will fail without the
-token. If a fast-lane task is not auto-approved, report why briefly; do not
-retry the human command.
+token. If a fast-lane task is not auto-approved, report the policy reason
+briefly and wait; do not retry the human command.
+
+The human never types shell commands. Never ask them to run `stg`, `gh`, `git`
+or any other command, and never print a command as an instruction. If a normal
+plan needs a human decision, ask one question in this chat (approve/reject) and
+wait for the answer. The human answers in chat; commands are your job.
 The dispatcher starts approved tasks; a worker opens as a tab in this space
 and owns its worktree. Never edit its worktree and never run the same task twice.
 

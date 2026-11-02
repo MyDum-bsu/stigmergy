@@ -96,3 +96,5 @@ def test_lead_startup_does_not_scan_board(repo: Path) -> None:
     text = lead.lead_prompt(config, "fixture")
     assert "Startup rule: do nothing" in text
     assert "Do not scan the board" in text
+    assert "never types shell commands" in text
+    assert "never ask" in text.lower()

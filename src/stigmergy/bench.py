@@ -12,6 +12,7 @@ substring. This keeps benchmarking deterministic and auditable.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -69,13 +70,15 @@ def evaluate(
                 .replace("{expected}", shlex.quote(expected))
                 .replace("{case}", str(index))
             )
-            env = {
-                "PATH": str(Path.home() / ".local" / "bin") + ":/usr/local/bin:/usr/bin:/bin",
-                "STG_MODEL": model,
-                "STG_CASE": str(index),
-                "STG_PROMPT_FILE": str(prompt_file),
-                "STG_EXPECTED": expected,
-            }
+            env = os.environ.copy()
+            env.update(
+                {
+                    "STG_MODEL": model,
+                    "STG_CASE": str(index),
+                    "STG_PROMPT_FILE": str(prompt_file),
+                    "STG_EXPECTED": expected,
+                }
+            )
             started = time.monotonic()
             try:
                 proc = subprocess.run(

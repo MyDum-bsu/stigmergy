@@ -143,6 +143,7 @@ def tick(
     memory = state if state is not None else load_state(config)
     notified: dict[str, int] = dict(memory.get("notified") or {})
     finishing: dict[str, int] = dict(memory.get("finishing") or {})
+    start_failed: dict[str, int] = dict(memory.get("start_failed") or {})
     actions: list[dict[str, Any]] = []
 
     app_status = herdr_app.status(app)
@@ -210,30 +211,37 @@ def tick(
         ]
         if ready:
             task = ready[0]
-            try:
-                result, _prompt = start_fn(
-                    config,
-                    board,
-                    task.id,
-                    "dispatcher",
-                    str(config.runner.get("kind", "herdr-app")),
-                    wait_runner=False,
-                    tab_name=f"{task.id} · {task.title}",
-                )
-                actions.append(
-                    {
-                        "action": "start",
-                        "task": task.id,
-                        "episode": result.episode,
-                        "terminal": result.runner_handle,
-                        "space": result.runner_space,
-                    }
-                )
-            except Exception as exc:
-                actions.append({"action": "start_failed", "task": task.id, "detail": str(exc)[:500]})
+            if start_failed.get(task.id) == task.last_seq:
+                ready = []
+            else:
+                try:
+                    result, _prompt = start_fn(
+                        config,
+                        board,
+                        task.id,
+                        "dispatcher",
+                        str(config.runner.get("kind", "herdr-app")),
+                        wait_runner=False,
+                        tab_name=f"{task.id} · {task.title}",
+                    )
+                    actions.append(
+                        {
+                            "action": "start",
+                            "task": task.id,
+                            "episode": result.episode,
+                            "terminal": result.runner_handle,
+                            "space": result.runner_space,
+                        }
+                    )
+                except Exception as exc:
+                    start_failed[task.id] = task.last_seq
+                    actions.append(
+                        {"action": "start_failed", "task": task.id, "detail": str(exc)[:500]}
+                    )
 
     memory["notified"] = notified
     memory["finishing"] = finishing
+    memory["start_failed"] = start_failed
     memory["last_tick"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     save_state(config, memory)
     return {

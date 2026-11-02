@@ -58,7 +58,7 @@ def plan_root(config: Config, *, create: bool = False) -> Path:
     path = config.integration_root
     if path.exists():
         branch = _git(path, "branch", "--show-current").stdout.strip()
-        if branch and branch != config.base:
+        if branch != config.base:
             raise BoardError(f"plan worktree {path} is on {branch!r}, expected {config.base!r}")
         return path
     if not create:

@@ -50,7 +50,7 @@ plan artifact, proactivity) — следующие слои.
 
 Проверено в этом окружении:
 
-- `uv run pytest -q` — 57 passed; `uv run ruff check .` — clean.
+- `uv run pytest -q` — 58 passed; `uv run ruff check .` — clean.
 - T5 end-to-end на клоне `optimization`: `stg run T5-land --runner noop --auto
   --no-sandbox` → `gate.passed`, `control.proven`, `integration.passed`,
   `merge.done`; `dev` fast-forward на `a9f57f6`, `.beads` не в дереве,

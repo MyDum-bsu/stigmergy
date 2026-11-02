@@ -100,3 +100,19 @@ def test_tick_finishes_settled_worker(repo: Path, monkeypatch) -> None:
     again = dispatcher.tick(config, board, finish=fake_finish, auto_finish=True, state=result["state"])
     assert again["actions"] == []
     assert seen == ["T1"]
+
+
+def test_start_failure_is_not_retried_every_tick(repo: Path, monkeypatch) -> None:
+    board = Board(repo)
+    config = _config(repo)
+    board_mod.add_task(board, config, "T1", "", spec_path="specs/T1.md")
+    monkeypatch.setattr(dispatcher.herdr_app, "status", lambda app: {"ok": True})
+
+    def bad_start(*args, **kwargs):
+        raise RuntimeError("no app")
+
+    state = {}
+    first = dispatcher.tick(config, board, start=bad_start, auto_finish=False, state=state)
+    assert first["actions"][0]["action"] == "start_failed"
+    second = dispatcher.tick(config, board, start=bad_start, auto_finish=False, state=state)
+    assert second["actions"] == []

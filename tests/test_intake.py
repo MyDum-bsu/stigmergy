@@ -41,7 +41,7 @@ def test_create_task_writes_request_and_planner(repo: Path, monkeypatch) -> None
         lambda app, name, folder: {"space": "sp0", "tabs": []},
     )
 
-    def fake_tab(app, space, name, folder, agent, task, agent_args=None):
+    def fake_tab(app, space, name, folder, agent, task, agent_args=None, argv=None):
         calls.update(space=space, name=name, folder=str(folder), agent_args=agent_args)
         return {"space": space, "terminal": "t-plan"}
 

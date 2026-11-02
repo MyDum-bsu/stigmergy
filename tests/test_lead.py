@@ -78,7 +78,7 @@ def test_start_lead_reuses_and_creates_tab(repo: Path, monkeypatch) -> None:
     )
     seen = {}
 
-    def fake_tab(app, space, name, folder, agent, task, agent_args=None):
+    def fake_tab(app, space, name, folder, agent, task, agent_args=None, argv=None):
         seen.update(space=space, name=name, agent=agent, agent_args=agent_args)
         return {"space": space, "tab": "tb0", "terminal": "t1"}
 

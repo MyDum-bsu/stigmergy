@@ -95,6 +95,15 @@ def start_lead(
             "terminal": _tab_terminal(tab),
             "created": False,
         }
+    argv = None
+    from stigmergy import sandbox
+
+    if config.runner.get("sandbox", True) and sandbox.bwrap_available():
+        argv = sandbox.lead_argv(
+            config.root,
+            str(config.runner.get("agent", "pi")),
+            LEAD_AGENT_ARGS,
+        )
     created = herdr_app.create_tab(
         app,
         space_id,
@@ -103,6 +112,7 @@ def start_lead(
         "pi",
         lead_prompt(config, space_name),
         agent_args=LEAD_AGENT_ARGS,
+        argv=argv,
     )
     terminal = str(created.get("terminal", ""))
     board.append(

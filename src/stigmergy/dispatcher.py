@@ -104,6 +104,16 @@ def _finish(config: Config, task_id: str) -> dict[str, Any]:
 
 
 
+def _terminal_alive(handle: str) -> bool:
+    try:
+        data = herdr_app.get(handle)
+    except Exception:
+        return False
+    status = data.get("status") or {}
+    state = str(status.get("state") or "")
+    return state not in {"exited", "failed", "dead"} and data.get("exit_code") is None
+
+
 def worker_done_seq(board: Board, task_id: str) -> int:
     """Latest worker.done after the latest episode.start/answer, else 0."""
     start = answer = done = 0
@@ -197,18 +207,51 @@ def tick(
             notified[task.id] = task.last_seq
 
     for task in active:
-        if task.status != "episode" or not auto_finish:
+        if task.status != "episode":
             continue
         marker = worker_done_seq(board, task.id)
-        if not marker or finishing.get(task.id) == marker:
+        if marker:
+            if not auto_finish or finishing.get(task.id) == marker:
+                continue
+            finishing[task.id] = marker
+            actions.append(
+                {
+                    "action": "finish",
+                    "task": task.id,
+                    "detail": f"worker.done seq={marker}",
+                    **finish_fn(config, task.id),
+                }
+            )
             continue
-        finishing[task.id] = marker
+        handle = task.runner_handle
+        if not handle or _terminal_alive(handle):
+            continue
+        board.append(
+            "episode.failed",
+            {"kind": "agent", "name": "dispatcher"},
+            {
+                "project.name": config.name,
+                "task.id": task.id,
+                "agent.name": "dispatcher",
+                "evidence": f"worker terminal lost: {handle}",
+            },
+            "worker terminal lost",
+        )
+        result = notify_lead(
+            board,
+            task.id,
+            (
+                f"Worker {task.id} died without worker.done (terminal {handle}). "
+                "Task failed; retry after the cause is fixed."
+            ),
+            hc=hc,
+        )
         actions.append(
             {
-                "action": "finish",
+                "action": "worker_dead",
                 "task": task.id,
-                "detail": f"worker.done seq={marker}",
-                **finish_fn(config, task.id),
+                "terminal": handle,
+                "notified": result.get("sent", False),
             }
         )
 

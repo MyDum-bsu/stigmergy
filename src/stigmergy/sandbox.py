@@ -165,6 +165,79 @@ def worker_argv(
     return argv
 
 
+def _profile_argv(
+    worktree: Path,
+    root: Path,
+    writable: list[Path],
+    agent: str,
+    agent_args: list[str],
+    aa_profile: str | None = None,
+) -> list[str]:
+    home = Path.home()
+    argv = _aa_prefix(aa_profile) + [
+        "bwrap",
+        "--ro-bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--tmpfs",
+        "/tmp",
+    ]
+    for path in (home / ".ssh", home / ".zcode", home / ".config", root / "data", root / "tracker" / "data"):
+        if path.exists():
+            argv.extend(["--tmpfs", str(path)])
+    for path in [*writable, home / ".pi", home / ".cache"]:
+        if path.exists():
+            argv.extend(["--bind", str(path), str(path)])
+    argv.extend(
+        [
+            "--chdir",
+            str(worktree),
+            "--die-with-parent",
+            "--new-session",
+            "--setenv",
+            "HOME",
+            str(home),
+            "--setenv",
+            "PATH",
+            os.environ.get("PATH", "/usr/bin:/bin"),
+            "--",
+            agent,
+            *agent_args,
+        ]
+    )
+    return argv
+
+
+def planner_argv(
+    plan_root: Path,
+    root: Path,
+    agent: str,
+    agent_args: list[str],
+    aa_profile: str | None = None,
+) -> list[str]:
+    return _profile_argv(plan_root, root, [plan_root], agent, agent_args, aa_profile)
+
+
+def lead_argv(
+    root: Path,
+    agent: str,
+    agent_args: list[str],
+    aa_profile: str | None = None,
+) -> list[str]:
+    return _profile_argv(
+        root,
+        root,
+        [root / ".agent", root / ".factory", Path.home() / ".config" / "herdr-app"],
+        agent,
+        agent_args,
+        aa_profile,
+    )
+
+
 def canary_script(worktree: Path, forbidden: list[Path]) -> str:
     checks = [
         "set -eu",

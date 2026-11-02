@@ -137,6 +137,10 @@ def cmd_board(args: argparse.Namespace) -> int:
         _emit(args, board_mod.block(board, config, args.id, args.agent, args.question))
         return 0
     if cmd == "answer":
+        if args.by == "human":
+            from stigmergy import human
+
+            human.require()
         _emit(args, board_mod.answer(board, config, args.id, args.by, args.text))
         return 0
     if cmd == "done":
@@ -456,6 +460,18 @@ def cmd_retro(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_human(args: argparse.Namespace) -> int:
+    from stigmergy import human
+
+    if args.human_cmd == "init":
+        path = human.init(force=args.force)
+        _emit(args, {"path": str(path)}, f"human token: {path}")
+        return 0
+    data = human.status()
+    _emit(args, data, f"human token: {data['path']} available={data['available']}")
+    return 0 if data["available"] else 1
+
+
 def cmd_metrics(args: argparse.Namespace) -> int:
     _root, config, board = _ctx(args)
     from stigmergy import metrics
@@ -528,6 +544,9 @@ def cmd_plan(args: argparse.Namespace) -> int:
         _emit(args, {"path": str(path)}, str(path))
         return 0
     if args.plan_cmd == "approve":
+        from stigmergy import human
+
+        human.require()
         data = intake.approve_plan(config, board, args.id, agent=args.agent)
         _emit(args, data, f"approved {data['task']} spec={data['spec_sha']}")
         return 0
@@ -1096,6 +1115,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--days", type=int, default=7)
     p.add_argument("--write", action="store_true")
     p.set_defaults(func=cmd_retro)
+
+    p = sub.add_parser("human", help="human authorization token")
+    h = p.add_subparsers(dest="human_cmd", required=True)
+    q = h.add_parser("init")
+    q.add_argument("--force", action="store_true")
+    q.set_defaults(func=cmd_human)
+    q = h.add_parser("status")
+    q.set_defaults(func=cmd_human)
 
     p = sub.add_parser("metrics", help="factory metrics and actor audit")
     p.set_defaults(func=cmd_metrics)

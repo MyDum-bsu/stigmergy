@@ -33,3 +33,17 @@ def test_gate_argv_can_use_aa_prefix(monkeypatch, tmp_path: Path) -> None:
     argv = sandbox.gate_argv(tmp_path, [], "true", {}, tmp_path)
     assert argv[:4] == ["aa-exec", "-p", "zcode", "--"]
     assert argv[4] == "bwrap"
+
+
+def test_planner_and_lead_profiles(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    plan = root / ".factory" / "integration"
+    (root / ".agent").mkdir(parents=True)
+    (root / ".factory").mkdir()
+    plan.mkdir(parents=True)
+    planner = sandbox.planner_argv(plan, root, "pi", [], aa_profile="zcode")
+    lead = sandbox.lead_argv(root, "pi", [], aa_profile="zcode")
+    assert planner[:4] == ["aa-exec", "-p", "zcode", "--"]
+    assert lead[:4] == ["aa-exec", "-p", "zcode", "--"]
+    assert str(plan) in planner and str(root / ".agent") in lead
+    assert str(root / ".agent") not in planner

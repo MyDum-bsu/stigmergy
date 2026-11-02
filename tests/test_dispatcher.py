@@ -116,3 +116,19 @@ def test_start_failure_is_not_retried_every_tick(repo: Path, monkeypatch) -> Non
     assert first["actions"][0]["action"] == "start_failed"
     second = dispatcher.tick(config, board, start=bad_start, auto_finish=False, state=state)
     assert second["actions"] == []
+
+
+def test_tick_fails_dead_worker(repo: Path, monkeypatch) -> None:
+    board = Board(repo)
+    config = _config(repo)
+    board_mod.add_task(board, config, "T1", "", spec_path="specs/T1.md")
+    board.append(
+        "episode.started",
+        {"kind": "agent", "name": "pi"},
+        {"project.name": "fixture", "task.id": "T1", "runner.handle": "dead"},
+    )
+    monkeypatch.setattr(dispatcher.herdr_app, "status", lambda app: {"ok": True})
+    monkeypatch.setattr(dispatcher.herdr_app, "get", lambda handle: (_ for _ in ()).throw(RuntimeError("gone")))
+    result = dispatcher.tick(config, board, auto_finish=False, state={})
+    assert any(action["action"] == "worker_dead" for action in result["actions"])
+    assert dispatcher.state_of(board, "fixture").task("T1").status == "failed"

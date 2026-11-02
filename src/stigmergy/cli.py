@@ -419,6 +419,35 @@ def cmd_merge(args: argparse.Namespace) -> int:
 
 
 # ── dash / status / doctor ─────────────────────────────────────────────────
+def cmd_lead(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from stigmergy import lead
+
+    if args.lead_cmd == "inbox":
+        items = lead.inbox(board, config)
+        lines = [
+            f"{item['id']}\t{item['terminal'] or '-'}\t{item['question']}"
+            for item in items
+        ]
+        _emit(args, items, "\n".join(lines) or "no blocked tasks")
+        return 0
+    if args.lead_cmd == "answer":
+        if not args.id or not args.text:
+            raise SystemExit("lead answer needs ID and --text")
+        data = lead.answer(config, board, args.id, args.text, app=args.app)
+        _emit(args, data, f"answered {args.id}; sent={data['sent']} terminal={data['terminal'] or '-'}")
+        return 0
+    data = lead.start_lead(
+        config,
+        board,
+        app=args.app,
+        space=args.space,
+        force=args.force,
+    )
+    _emit(args, data, f"lead space={data['space']} terminal={data['terminal']} created={data['created']}")
+    return 0
+
+
 def cmd_wave(args: argparse.Namespace) -> int:
     _root, config, board = _ctx(args)
     from stigmergy.wave import create_wave
@@ -778,6 +807,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("--agent", default="stg")
     p.set_defaults(func=cmd_merge)
+
+    p = sub.add_parser("lead", help="lead architect tab")
+    p.add_argument("lead_cmd", nargs="?", choices=["start", "inbox", "answer"], default="start")
+    p.add_argument("id", nargs="?")
+    p.add_argument("--text")
+    p.add_argument("--space")
+    p.add_argument("--app", default="herdr-app")
+    p.add_argument("--force", action="store_true")
+    p.set_defaults(func=cmd_lead)
 
     p = sub.add_parser("wave", help="one Herdr space: lead + worker tabs")
     p.add_argument("--goal", required=True)

@@ -185,6 +185,11 @@ class Spec:
         return raw if isinstance(raw, dict) else {}
 
     @property
+    def auto_approve(self) -> bool:
+        value = self.meta.get("auto_approve", False)
+        return value is True or str(value).strip().lower() in {"1", "true", "yes"}
+
+    @property
     def invariants(self) -> list[str]:
         raw = self.meta.get("invariants") or []
         return [str(item) for item in raw] if isinstance(raw, list) else []

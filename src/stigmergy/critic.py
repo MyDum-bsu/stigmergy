@@ -130,7 +130,7 @@ def start_critic(
         prd=_prd(config, task_id),
         report_path=str(report_path(config, task_id)),
     )
-    space_name = str(config.runner.get("space", "") or "") or "optimization"
+    space_name = config.space
     space = herdr_app.ensure_space(app, space_name, config.root)
     space_id = str(space.get("space") or space.get("id") or "")
     args = list(DEFAULT_CRITIC_ARGS)

@@ -25,9 +25,16 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "keep_workspace": True,
         "model": "",
         "critic_model": "",
+        "space": "",
     },
     "risk": {"low": "auto", "medium": "auto", "high": "human"},
     "dispatcher": {"auto_finish": True, "interval_seconds": 5, "max_retries": 1, "auto_judge": True},
+    "factory": {
+        "auto_approve": False,
+        "fast_max_paths": 1,
+        "fast_max_oracle": 2,
+        "fast_max_dod_chars": 1200,
+    },
     "models": {
         "default": "",
         "worker": "",
@@ -88,6 +95,11 @@ class Config:
         return self.section("runner")
 
     @property
+    def space(self) -> str:
+        """Herdr project space: explicit runner.space, else the project name."""
+        return str(self.runner.get("space") or "") or self.name
+
+    @property
     def gate(self) -> dict[str, Any]:
         return self.section("gate")
 
@@ -140,6 +152,13 @@ gate_network = "none"
 [runner]
 kind = "manual"
 agent = "pi"
+space = "{name}"
+
+[factory]
+auto_approve = false
+fast_max_paths = 1
+fast_max_oracle = 2
+fast_max_dod_chars = 1200
 
 [models]
 default = ""

@@ -10,7 +10,6 @@ from stigmergy.runner import herdr_app
 
 LEAD_TAB = "Lead · architect"
 LEAD_AGENT_ARGS = ["--exclude-tools", "edit,write"]
-DEFAULT_SPACE = "optimization"
 
 
 def lead_prompt(config: Config, space: str) -> str:
@@ -28,11 +27,20 @@ current directory, especially after `cd`: a worktree has no board of its own.
 
 Human task intake (the human does not create branches or specs):
   stg task "<raw idea>"
-That creates the request, the task, and a Plan tab. When the plan is ready:
+For a tiny, reversible, one-file change use:
+  stg task --quick "<raw idea>"
+--quick writes a compact fast-lane spec; the dispatcher may policy-approve it
+without the human. Otherwise the normal plan needs one human approve:
   stg plan show <ID>
   stg plan approve <ID>
+Never run `plan approve` yourself: it is human-only and will fail without the
+token. If a fast-lane task is not auto-approved, report why briefly; do not
+retry the human command.
 The dispatcher starts approved tasks; a worker opens as a tab in this space
 and owns its worktree. Never edit its worktree and never run the same task twice.
+
+Scope: only this project root. If the request points outside the repository,
+say so in one line and do not inspect/change the other repository.
 
 Workers are forbidden to ask the human. When a worker is blocked it writes
 task.blocked and stops. Inspect the lead inbox:
@@ -82,7 +90,7 @@ def start_lead(
     force: bool = False,
 ) -> dict:
     """Create (or return) the persistent lead tab in the project space."""
-    space_name = space or str(config.runner.get("space", "") or "") or DEFAULT_SPACE
+    space_name = space or config.space
     project_space = herdr_app.ensure_space(app, space_name, config.root)
     space_id = _space_id(project_space)
     if not space_id:

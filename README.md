@@ -20,10 +20,12 @@
 
 ```bash
 stg task "добавить HQ-сканы в трекер"   # request + task + Plan tab
+stg task --quick "мелкая правка"          # compact fast-lane spec
 stg plan list
 stg plan show <ID>
 stg plan render <ID>                    # HTML-артефакт плана
-stg plan approve <ID>                   # commit spec в dev + attach к task
+stg plan approve <ID>                   # human: commit spec в dev + attach
+stg plan auto <ID>                      # policy fast lane, no token
 stg verify                              # TLA+ lifecycle model + live invariants
 stg dispatcher --once                   # один тик
 stg dispatcher --watch                  # демон: старт/финиш/уведомления
@@ -83,7 +85,7 @@ installed as user systemd timers on this machine.
 
 Проверено в этом окружении:
 
-- `uv run pytest -q` — 112 passed; `uv run ruff check .` — clean.
+- `uv run pytest -q` — 115 passed; `uv run ruff check .` — clean.
 - T5 end-to-end на клоне `optimization`: `stg run T5-land --runner noop --auto
   --no-sandbox` → `gate.passed`, `control.proven`, `integration.passed`,
   `merge.done`; `dev` fast-forward на `a9f57f6`, `.beads` не в дереве,

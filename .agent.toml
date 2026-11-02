@@ -21,6 +21,10 @@ gate_network = "none"
 kind = "herdr-app"
 app = "herdr-app"
 agent = "pi"
+space = "stigmergy"
+
+[factory]
+auto_approve = true
 
 [risk]
 low = "auto"

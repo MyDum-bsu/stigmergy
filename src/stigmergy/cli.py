@@ -742,6 +742,7 @@ def cmd_task(args: argparse.Namespace) -> int:
         start_planner=not args.no_planner,
         source=args.source,
         source_id=args.source_id or "",
+        quick=args.quick,
     )
     planner = data.get("planner") or {}
     text = (
@@ -792,6 +793,10 @@ def cmd_plan(args: argparse.Namespace) -> int:
             open_browser=args.open,
         )
         return 0
+    if args.plan_cmd == "auto":
+        data = intake.auto_approve_plan(config, board, args.id)
+        _emit(args, data, f"auto-approved {args.id}" if data.get("ok") else data.get("detail", "not approved"))
+        return 0 if data.get("ok") else 1
     if args.plan_cmd == "approve":
         from stigmergy import human
 
@@ -1312,6 +1317,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-planner", action="store_true")
     p.add_argument("--source", default="human")
     p.add_argument("--source-id", default="")
+    p.add_argument("--quick", action="store_true")
     p.set_defaults(func=cmd_task)
 
     p = sub.add_parser("plan", help="planner drafts and approval")
@@ -1327,6 +1333,9 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--open", action="store_true")
     q.set_defaults(func=cmd_plan)
     q = pl.add_parser("render")
+    q.add_argument("id")
+    q.set_defaults(func=cmd_plan)
+    q = pl.add_parser("auto")
     q.add_argument("id")
     q.set_defaults(func=cmd_plan)
     q = pl.add_parser("approve")

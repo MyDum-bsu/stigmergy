@@ -194,6 +194,32 @@ def tick(
         }
 
     snapshot = state_of(board, config.name)
+    if config.section("factory").get("auto_approve"):
+        from stigmergy import intake
+
+        auto_actions: list[dict[str, Any]] = []
+        for task in snapshot.all():
+            if task.status != "queued" or task.spec:
+                continue
+            try:
+                verdict = intake.auto_approve_plan(config, board, task.id)
+            except Exception as exc:
+                actions.append(
+                    {"action": "auto_approve_failed", "task": task.id, "detail": str(exc)[:500]}
+                )
+                continue
+            if verdict.get("ok"):
+                auto_actions.append(
+                    {
+                        "action": "auto_approve",
+                        "task": task.id,
+                        "policy": verdict.get("policy", ""),
+                        "spec_sha": verdict.get("spec_sha", ""),
+                    }
+                )
+        if auto_actions:
+            actions.extend(auto_actions)
+            snapshot = state_of(board, config.name)
     active = snapshot.current()
     blocked = snapshot.blocked()
     active_ids = {task.id for task in active}

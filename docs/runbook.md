@@ -42,6 +42,28 @@ stg spec validate specs/T1.md --base dev
 Спека коммитится в `base` до постановки задачи: гейт читает её из `base`, а не
 из рабочего дерева.
 
+### Fast lane
+
+```toml
+[factory]
+auto_approve = true
+fast_max_paths = 1
+fast_max_oracle = 2
+fast_max_dod_chars = 1200
+```
+
+```bash
+stg task --quick "одна правка в одном файле"
+stg plan auto <ID>       # policy approval without human token
+```
+
+Fast lane разрешает только `risk: low`, ровно один `allowed_paths`, 1–2
+`oracle_paths`, короткий `dod` и `auto_approve: true` в спеке. Запрещены
+`data/`, `.git`, секреты, `rm -rf`, `git push`, сеть, `sudo`, `systemctl`.
+Dispatcher сам делает policy-approve и пишет `plan.approved` с
+`approval.mode=policy`; gate и merge остаются обязательными. Всё, что не
+прошло policy, идёт обычным путём с человеческим approve.
+
 ## 4. Задача и ручной эпизод
 
 ```bash

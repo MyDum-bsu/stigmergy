@@ -76,6 +76,8 @@ def _rebase(config: Config, task_wt: Path, base: str) -> tuple[bool, str]:
 
 def ff_base(config: Config, commit: str) -> tuple[bool, str]:
     """Fast-forward the base branch to ``commit`` in the integration worktree."""
+    if config.base in config.protected:
+        return False, f"refusing to write protected base {config.base}"
     int_wt, detached = _integration_worktree(config)
     proc = git(int_wt, "merge", "--ff-only", commit, check=False)
     if proc.returncode != 0:

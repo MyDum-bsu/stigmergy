@@ -54,7 +54,7 @@ def gate_argv(
     env: dict[str, str],
     home: Path,
 ) -> list[str]:
-    argv = _common(worktree, home, env)
+    argv = _aa_prefix() + _common(worktree, home, env)
     argv.append("--unshare-net")
     for path in oracle_paths:
         if path.exists():
@@ -74,6 +74,94 @@ def episode_argv(
     if repo_git_dir and repo_git_dir.exists():
         argv.extend(["--ro-bind", str(repo_git_dir), str(repo_git_dir)])
     argv.extend(["--", *command])
+    return argv
+
+
+def _aa_profile() -> str:
+    """Herdr terminals are AppArmor 'unconfined'; userns needs the zcode profile."""
+    try:
+        current = Path("/proc/self/attr/current").read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+    if "unconfined" not in current or current.startswith("zcode"):
+        return ""
+    exe = shutil.which("aa-exec")
+    if not exe:
+        return ""
+    probe = subprocess.run(
+        [exe, "-p", "zcode", "--", "true"],
+        capture_output=True,
+        check=False,
+    )
+    return "zcode" if probe.returncode == 0 else ""
+
+
+def _aa_prefix(profile: str | None = None) -> list[str]:
+    name = profile if profile is not None else _aa_profile()
+    return ["aa-exec", "-p", name, "--"] if name else []
+
+
+def worker_argv(
+    worktree: Path,
+    root: Path,
+    agent: str,
+    agent_args: list[str],
+    aa_profile: str | None = None,
+) -> list[str]:
+    """Filesystem sandbox for an agent that still needs the model network.
+
+    Root is read-only; the worktree, the board and pi's auth/cache are the only
+    writable mounts. Secrets, data/ and other home config are masked.
+    """
+    home = Path.home()
+    argv = _aa_prefix(aa_profile) + [
+        "bwrap",
+        "--ro-bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--tmpfs",
+        "/tmp",
+    ]
+    masked = [
+        home / ".ssh",
+        home / ".zcode",
+        home / ".config",
+        root / "data",
+        root / "tracker" / "data",
+    ]
+    for path in masked:
+        if path.exists():
+            argv.extend(["--tmpfs", str(path)])
+    writable = [
+        worktree,
+        root / ".agent",
+        home / ".pi",
+        home / ".cache",
+    ]
+    for path in writable:
+        if path.exists():
+            argv.extend(["--bind", str(path), str(path)])
+    argv.extend(
+        [
+            "--chdir",
+            str(worktree),
+            "--die-with-parent",
+            "--new-session",
+            "--setenv",
+            "HOME",
+            str(home),
+            "--setenv",
+            "PATH",
+            os.environ.get("PATH", "/usr/bin:/bin"),
+            "--",
+            agent,
+            *agent_args,
+        ]
+    )
     return argv
 
 

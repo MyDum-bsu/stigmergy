@@ -39,6 +39,7 @@ class GateResult:
     artifact_dir: Path = Path()
     stdout: str = ""
     stderr: str = ""
+    formal: dict[str, Any] | None = None
     passed: bool = False
 
     def as_dict(self) -> dict[str, Any]:
@@ -57,6 +58,7 @@ class GateResult:
             "artifact": str(self.artifact_dir),
             "stdout_sha256": hashlib.sha256(self.stdout.encode()).hexdigest(),
             "stderr_sha256": hashlib.sha256(self.stderr.encode()).hexdigest(),
+            "formal": self.formal,
             "passed": self.passed,
         }
 
@@ -370,6 +372,12 @@ def run_gate(
             control["result"] == "proven"
             or (spec.risk == "low" and control["result"] == "absent")
         )
+        formal = None
+        if spec.risk == "high":
+            from stigmergy.formal import verify_core
+
+            formal = verify_core(config)
+            passed = passed and bool(formal.get("passed"))
         result = GateResult(
             task=spec.id,
             episode=episode,
@@ -384,6 +392,7 @@ def run_gate(
             artifact_dir=artifact_dir,
             stdout=stdout,
             stderr=stderr,
+            formal=formal,
             passed=passed,
         )
         (artifact_dir / "gate.json").write_text(

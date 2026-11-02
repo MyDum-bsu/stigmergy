@@ -94,3 +94,11 @@ def test_worker_done_is_a_marker(repo: Path) -> None:
     event = board_mod.worker_done(board, config, "T1", "pi")
     assert event["action"] == "worker.done"
     assert _state(board).task("T1").status == "queued"
+
+
+def test_done_with_commit_requires_gate(repo: Path) -> None:
+    board = Board(repo)
+    config = Config.load(repo)
+    board_mod.add_task(board, config, "T1", "", spec_path="specs/T1.md")
+    with pytest.raises(BoardError, match="gate.passed"):
+        board_mod.done(board, config, "T1", "pi", commit="deadbeef", evidence="trust me")

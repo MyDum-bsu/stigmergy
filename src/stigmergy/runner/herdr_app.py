@@ -153,6 +153,7 @@ def create_tab(
     agent: str,
     task: str,
     agent_args: list[str] | None = None,
+    argv: list[str] | None = None,
 ) -> dict:
     ensure_app(app)
     return _do(
@@ -161,7 +162,7 @@ def create_tab(
         name=name,
         space=space,
         folder=str(folder),
-        argv=[agent, *(agent_args or [])],
+        argv=argv or [agent, *(agent_args or [])],
         task=task,
     )
 
@@ -305,6 +306,7 @@ class HerdrAppRunner:
         tab_name: str | None = None,
         space_folder: Path | None = None,
         agent_args: list[str] | None = None,
+        argv: list[str] | None = None,
     ):
         self.app = app
         self.agent = agent
@@ -313,6 +315,7 @@ class HerdrAppRunner:
         self.tab_name = tab_name
         self.space_folder = space_folder
         self.agent_args = list(agent_args or [])
+        self.argv = list(argv or [])
 
     def start(self, task_id: str, prompt: str, workspace: Path, wait: bool = True) -> RunnerHandle:
         if self.space:
@@ -328,6 +331,7 @@ class HerdrAppRunner:
                 self.agent,
                 prompt,
                 agent_args=self.agent_args,
+                argv=self.argv or None,
             )
         else:
             created = create_space(

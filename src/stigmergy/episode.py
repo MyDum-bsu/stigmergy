@@ -159,6 +159,17 @@ def start_episode(
         agent_args = ["--exclude-tools", "AskUserQuestion"]
         for skill in spec.skills:
             agent_args.extend(["--skill", skill])
+        worker_argv = None
+        if config.runner.get("sandbox", True):
+            from stigmergy import sandbox
+
+            if config.sandbox.get("engine") == "bwrap" and sandbox.bwrap_available():
+                worker_argv = sandbox.worker_argv(
+                    wt.path,
+                    config.root,
+                    str(config.runner.get("agent", "pi")),
+                    agent_args,
+                )
         app_runner = HerdrAppRunner(
             app=str(config.runner.get("app", "herdr-app")),
             agent=str(config.runner.get("agent", "pi")),
@@ -167,6 +178,7 @@ def start_episode(
             tab_name=tab_name,
             space_folder=config.root,
             agent_args=agent_args,
+            argv=worker_argv,
         )
         try:
             handle = app_runner.start(task.id, prompt, wt.path, wait=wait_runner)
@@ -511,8 +523,8 @@ def merge_task(config: Config, board: Board, task_id: str, agent: str = "stg") -
     task = state.task(task_id)
     if not task.commit or not task.tree:
         raise RuntimeError("no integrated commit for task")
-    if task.risk == "high" and not task.answer:
-        raise RuntimeError("high-risk merge requires a human answer")
+    if task.risk == "high" and task.answer_by != "human":
+        raise RuntimeError("high-risk merge requires a human answer (answered.by=human)")
     ok, detail = ff_base(config, task.commit)
     result = EpisodeResult(
         task_id=task.id,

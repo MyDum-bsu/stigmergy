@@ -55,6 +55,7 @@ class Task:
     sha: str = ""
     question: str = ""
     answer: str = ""
+    answer_by: str = ""
     labels: dict[str, str] = field(default_factory=dict)
 
     @property
@@ -85,6 +86,7 @@ class Task:
             "sha": self.sha,
             "question": self.question,
             "answer": self.answer,
+            "answer_by": self.answer_by,
         }
 
 
@@ -235,6 +237,7 @@ class ProjectState:
             task.question = attrs.get("question", task.question)
         elif action == "task.answered":
             task.answer = attrs.get("answer", task.answer)
+            task.answer_by = attrs.get("answered.by", task.answer_by)
             if task.commit and task.tree:
                 task.status = INTEGRATED
             elif task.episode_open:

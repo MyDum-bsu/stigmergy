@@ -307,6 +307,15 @@ def done(
         raise BoardError("--evidence is required")
     if not commit and not no_commit:
         raise BoardError("pass --commit <sha> or --no-commit with evidence")
+    if commit:
+        passed = any(
+            event.get("action") == "gate.passed"
+            and str((event.get("attributes") or {}).get("task.id", "")) == task_id
+            and str((event.get("attributes") or {}).get("vcs.commit", "")) == commit
+            for event in board.read()
+        )
+        if not passed:
+            raise BoardError("board done with a commit requires gate.passed for that commit")
     return board.append(
         "task.done",
         _actor(agent),

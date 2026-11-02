@@ -58,7 +58,7 @@ def test_detached_start_does_not_wait(monkeypatch) -> None:
     monkeypatch.setattr(
         herdr_app,
         "create_space",
-        lambda app, name, folder, agent, task, agent_args=None: {"space": "sp1", "terminal": "t1"},
+        lambda app, name, folder, agent, task, agent_args=None, argv=None: {"space": "sp1", "terminal": "t1"},
     )
     called = []
     monkeypatch.setattr(herdr_app, "wait_until_settled", lambda *a, **k: called.append(1))
@@ -84,7 +84,7 @@ def test_project_space_reuses_and_opens_tab(monkeypatch) -> None:
     monkeypatch.setattr(herdr_app, "ensure_app", lambda app: None)
     seen = {}
 
-    def fake_tab(app, space, name, folder, agent, task, agent_args=None):
+    def fake_tab(app, space, name, folder, agent, task, agent_args=None, argv=None):
         seen.update(space=space, name=name, folder=str(folder))
         return {"space": space, "terminal": "t1"}
 
@@ -110,7 +110,7 @@ def test_project_space_is_created_when_missing(monkeypatch) -> None:
     monkeypatch.setattr(
         herdr_app,
         "create_tab",
-        lambda app, space, name, folder, agent, task, agent_args=None: {"space": space, "terminal": "t1"},
+        lambda app, space, name, folder, agent, task, agent_args=None, argv=None: {"space": space, "terminal": "t1"},
     )
     runner = herdr_app.HerdrAppRunner(space="optimization", space_folder=Path("/repo"))
     handle = runner.start("mo-a7j", "prompt", Path("/repo/.factory/worktrees/x"), wait=False)

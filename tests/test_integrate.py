@@ -40,3 +40,12 @@ def test_integrate_conflict_requeues(repo: Path) -> None:
     result = integrate(config, spec, wt.path, "dev", "ep-conflict", use_sandbox=False)
     assert not result.ok
     assert result.detail
+
+
+def test_protected_base_refuses_ff(repo: Path) -> None:
+    from stigmergy.config import Config
+    from stigmergy.integrate import ff_base
+
+    config = Config(root=repo, raw={"project": {"base": "main", "protected": ["main"]}})
+    ok, detail = ff_base(config, "deadbeef")
+    assert not ok and "protected" in detail

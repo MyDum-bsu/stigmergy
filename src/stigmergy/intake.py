@@ -124,6 +124,11 @@ Spec frontmatter (YAML, exact keys):
     config: oracle/<ID>/Task.cfg
     mutant_model: oracle/<ID>/TaskMutant.tla
     mutant_cfg: oracle/<ID>/TaskMutant.cfg
+  properties:
+    command: "<PBT command; runs once per seed>"
+    seeds: 16
+  live_model:
+    command: "<live-model probe; alternative to properties>"
   skills: [<optional agent skill paths, e.g. ~/.agents/skills/code-review/SKILL.md>]
   dod: "<one shell command: fails before, passes after>"
   negative_control:
@@ -136,6 +141,8 @@ Rules:
 - Do not run the task, do not create branches/worktrees, do not merge.
 - The spec must be executable: `dod` is one command, oracle paths are tests,
   and a medium/high-risk spec has a negative corpus.
+- For high risk, `properties.command` or `live_model.command` is mandatory;
+  otherwise approval fails before a worker starts.
 - If a decision is genuinely missing, put one short "Open questions" block in
   the PRD and stop. Do not ask through AskUserQuestion.
 - When the drafts are ready, stop. The human runs `stg plan approve {task_id}`.

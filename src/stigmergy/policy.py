@@ -65,6 +65,8 @@ def evaluate(config: Config, spec: Spec) -> dict[str, Any]:
             reasons.append(f"dod contains forbidden operation: {pattern}")
     if spec.invariants and spec.risk != "high":
         reasons.append("invariants are for high-risk formal tasks")
+    if spec.negative_corpus:
+        reasons.append("negative_control is for normal lane; fast lane has no negative corpus")
     return {
         "ok": not reasons,
         "policy": POLICY,

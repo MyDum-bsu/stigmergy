@@ -59,3 +59,17 @@ def test_policy_requires_opt_in_and_flag(repo: Path) -> None:
     task_id = _draft_spec(repo, config, board, auto=False, idea="fix another typo")
     data = intake.auto_approve_plan(config, board, task_id)
     assert not data["ok"]
+
+
+def test_preflight_rejects_missing_oracle(repo: Path) -> None:
+    config = Config.load(repo)
+    config.raw["factory"] = {"auto_approve": True}
+    board = Board(repo)
+    task_id = _draft_spec(repo, config, board, idea="missing oracle")
+    spec = intake.paths_for(config, task_id)["spec"]
+    text = spec.read_text().replace("  - test_gate.py", "  - tests/missing_oracle.py")
+    spec.write_text(text, encoding="utf-8")
+    preflight = intake.preflight_draft(config, task_id)
+    assert not preflight["ok"]
+    assert any("oracle path" in error for error in preflight["errors"])
+    assert not intake.auto_approve_plan(config, board, task_id)["ok"]

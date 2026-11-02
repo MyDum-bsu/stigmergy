@@ -151,7 +151,7 @@ def fetch_issues(config: Config, *, state: str = "open") -> list[dict[str, Any]]
         "--limit",
         "100",
         "--json",
-        "number,title,url,state,labels",
+        "number,title,url,state,labels,author",
     )
     if data is None:
         raise BoardError(f"gh issue list failed: {err}")
@@ -166,7 +166,7 @@ def fetch_issues(config: Config, *, state: str = "open") -> list[dict[str, Any]]
             "view",
             str(number),
             "--json",
-            "number,title,body,url,state,labels,comments",
+            "number,title,body,url,state,labels,comments,author",
         )
         if detail is None:
             raise BoardError(f"gh issue view #{number} failed: {detail_err}")
@@ -244,7 +244,9 @@ def _plan_sync(
                     "action": "import" if include_import else "skip",
                     "issue": number,
                     "title": issue.get("title", ""),
+                    "body": issue.get("body", ""),
                     "url": issue.get("url", ""),
+                    "author": str((issue.get("author") or {}).get("login") or ""),
                 }
             )
             continue
@@ -311,27 +313,37 @@ def sync(
     for action in actions:
         kind = action["action"]
         if kind == "import":
-            from stigmergy import intake
+            from stigmergy import source
 
             number = int(action["issue"])
-            source_id = f"{repo_name}#{number}"
-            idea = (
-                f"GitHub issue #{number}: {action['title']}\n\n"
-                f"{action['url']}\n\n"
-                "This request came from GitHub; the issue is a mirror, the board is the source of truth."
+            trigger = source.Trigger(
+                source="github",
+                trigger_id=f"{repo_name}#{number}",
+                thread=f"github:{repo_name}#{number}",
+                actor=str(action.get("author") or "github"),
+                title=str(action["title"]),
+                text=(
+                    f"GitHub issue #{number}: {action['title']}\n\n"
+                    f"{action.get('body') or ''}\n\n"
+                    f"{action['url']}\n\n"
+                    "This request came from GitHub; the issue is a mirror, the board is the source of truth."
+                ),
+                kind="issue",
+                url=str(action["url"]),
             )
-            result = intake.create_task(
+            github_cfg = config.section("github")
+            result = source.ingest(
                 config,
                 board,
-                idea,
-                title=str(action["title"])[:120],
-                source="github",
-                source_id=source_id,
+                trigger,
+                accept_mode=str(github_cfg.get("accept_mode") or "auto"),
+                allowed_actors=tuple(str(x) for x in (github_cfg.get("allowed_users") or [])),
                 start_planner=start_planner,
             )
-            task_id = str(result["task"])
-            link(config, board, task_id, number, str(action["url"]), repo_name=repo_name)
-            imported += 1
+            task_id = str(result.get("task") or "")
+            if task_id:
+                link(config, board, task_id, number, str(action["url"]), repo_name=repo_name)
+                imported += 1
         elif kind == "link":
             link(
                 config,

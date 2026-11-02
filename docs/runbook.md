@@ -232,6 +232,8 @@ stg visual check --target http://127.0.0.1:3000 --run  # человек
 [github]
 repo = ""                 # пусто → gh repo view (origin)
 label = "stigmergy"       # какие issues импортировать
+accept_mode = "auto"      # observe | auto
+allowed_users = []        # пусто → label issue достаточно
 ```
 
 ```bash
@@ -244,9 +246,12 @@ stg github pr <ID> --push
 stg github checks <ID>
 ```
 
-Issue с меткой `stigmergy` становится request/task; `stg:<ID>` в labels или
-`github.issue.linked` связывает issue с задачей. Комментарии issue пишутся в
-board как `github.comment.in`; `task.note`/`task.answered` после link уходят
+Issue с меткой `stigmergy` становится `source.trigger`/request/task;
+`stg:<ID>` в labels или `github.issue.linked` связывает issue с задачей.
+`source.trigger` и `mandate.granted` пишутся в board; `accept_mode=observe`
+только записывает кандидата, `auto` создаёт task. `allowed_users` — список
+GitHub login, пустой список означает доверие метке. Комментарии issue пишутся
+в board как `github.comment.in`; `task.note`/`task.answered` после link уходят
 в issue при `--push`. `task.pr` хранит PR URL, `checks` читает CI, но вердикт
 по-прежнему даёт gate, не GitHub. Все write-операции требуют human token.
 

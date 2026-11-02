@@ -388,6 +388,28 @@ def reject_plan(config: Config, board: Board, task_id: str, reason: str) -> dict
     )
 
 
+def preflight_draft(config: Config, task_id: str) -> dict[str, Any]:
+    """Check a draft before it can be policy- or human-approved."""
+    paths = paths_for(config, task_id)
+    errors: list[str] = []
+    if not paths["spec"].exists():
+        return {"ok": False, "errors": [f"no draft spec: {paths['spec']}"], "task": task_id}
+    spec = Spec.from_text(paths["spec"].read_text(encoding="utf-8"), paths["spec"])
+    errors.extend(spec.validate())
+    for path in spec.oracle_paths:
+        local = paths["root"] / path
+        in_base = _git(config.root, "cat-file", "-e", f"{config.base}:{path}").returncode == 0
+        if not local.exists() and not in_base:
+            errors.append(f"oracle path is neither in draft nor in {config.base}: {path}")
+    if spec.negative_corpus:
+        local = paths["root"] / spec.negative_corpus
+        listing = _git(config.root, "ls-tree", "-r", "--name-only", config.base, "--", spec.negative_corpus)
+        in_base = bool(listing.stdout.strip())
+        if not local.exists() and not in_base:
+            errors.append(f"negative corpus not found: {spec.negative_corpus}")
+    return {"ok": not errors, "errors": errors, "task": task_id, "spec_sha": spec.sha}
+
+
 def approve_plan(
     config: Config,
     board: Board,
@@ -403,9 +425,9 @@ def approve_plan(
         raise BoardError(f"no draft spec: {paths['spec']}")
     raw = paths["spec"].read_text(encoding="utf-8")
     spec = Spec.from_text(raw, paths["spec"])
-    errors = spec.validate()
-    if errors:
-        raise SpecError("; ".join(errors))
+    check = preflight_draft(config, task_id)
+    if not check["ok"]:
+        raise SpecError("; ".join(check["errors"]))
     if auto:
         from stigmergy import policy as policy_mod
 
@@ -464,6 +486,9 @@ def auto_approve_plan(config: Config, board: Board, task_id: str) -> dict[str, A
     paths = paths_for(config, task_id)
     if not paths["spec"].exists():
         return {"task": task_id, "ok": False, "detail": "no draft spec"}
+    check = preflight_draft(config, task_id)
+    if not check["ok"]:
+        return {"task": task_id, "ok": False, "detail": "; ".join(check["errors"]), "preflight": check}
     spec = Spec.from_text(paths["spec"].read_text(encoding="utf-8"), paths["spec"])
     from stigmergy import policy as policy_mod
 

@@ -504,6 +504,15 @@ def cmd_mirror(args: argparse.Namespace) -> int:
     return 0 if data.get("ok") else 1
 
 
+def cmd_source(args: argparse.Namespace) -> int:
+    _root, _config, board = _ctx(args)
+    from stigmergy import source
+
+    data = source.status(board)
+    _emit(args, data, json.dumps(data, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_github(args: argparse.Namespace) -> int:
     _root, config, board = _ctx(args)
     from stigmergy import github, human
@@ -793,6 +802,12 @@ def cmd_plan(args: argparse.Namespace) -> int:
             open_browser=args.open,
         )
         return 0
+    if args.plan_cmd == "preflight":
+        data = intake.preflight_draft(config, args.id)
+        _emit(args, data, f"preflight {args.id}: {'PASS' if data['ok'] else 'FAIL'}")
+        if not data["ok"]:
+            print("\n".join(data["errors"]), file=sys.stderr)
+        return 0 if data["ok"] else 1
     if args.plan_cmd == "auto":
         data = intake.auto_approve_plan(config, board, args.id)
         _emit(args, data, f"auto-approved {args.id}" if data.get("ok") else data.get("detail", "not approved"))
@@ -1335,6 +1350,9 @@ def build_parser() -> argparse.ArgumentParser:
     q = pl.add_parser("render")
     q.add_argument("id")
     q.set_defaults(func=cmd_plan)
+    q = pl.add_parser("preflight")
+    q.add_argument("id")
+    q.set_defaults(func=cmd_plan)
     q = pl.add_parser("auto")
     q.add_argument("id")
     q.set_defaults(func=cmd_plan)
@@ -1424,6 +1442,11 @@ def build_parser() -> argparse.ArgumentParser:
     q = mi.add_parser("github")
     q.add_argument("--apply", action="store_true")
     q.set_defaults(func=cmd_mirror)
+
+    p = sub.add_parser("source", help="source trigger/thread/mandate status")
+    src = p.add_subparsers(dest="source_cmd", required=True)
+    q = src.add_parser("status")
+    q.set_defaults(func=cmd_source)
 
     p = sub.add_parser("github", help="GitHub issues, comments and PRs")
     gh = p.add_subparsers(dest="github_cmd", required=True)

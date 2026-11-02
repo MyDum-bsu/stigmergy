@@ -1,8 +1,7 @@
 diff --git a/AGENTS.md b/AGENTS.md
 --- a/AGENTS.md
 +++ b/AGENTS.md
-@@ -30,3 +30,7 @@
- 
+@@ -31,2 +31,6 @@
  Рабочая ветка — `dev`; `main` только через `stg promote --apply` после
  человеческого go-ahead. Feature-ветка живёт до merge в `dev`.
 +

@@ -30,3 +30,18 @@ medium/high обязателен negative control.
 
 Рабочая ветка — `dev`; `main` только через `stg promote --apply` после
 человеческого go-ahead. Feature-ветка живёт до merge в `dev`.
+
+## GitHub
+
+GitHub (`MyDum-bsu/stigmergy`) — публичный слой: issue лишь зеркало задачи, источник истины — доска.
+
+- Вход: `gh issue view <N>` и `gh issue list` — прочитать постановку и очередь; issue
+  заполняет `stg mirror`, правки постановки идут событием доски, а не правкой issue.
+- Выход: `gh pr create --base dev` из feature-ветки (или `stg github pr <id>`, если
+  есть human-токен); прямых пушей в `dev` и `main` нет.
+- Учёт: `stg board` — `list`, `show <id>`, `status`; PR привязывается к задаче командой
+  `stg board pr <id> --url <ссылка на PR>`, номер PR берётся из ссылки.
+- Ревью и комментарии: `gh pr review`, `gh pr comment`, `stg github comment <id>`;
+  issue — только зеркальное уведомление, обсуждение ведёт доска.
+- Закрытие задачи — событие доски (`stg worker done`), issue закрывает контур после merge,
+  не worker.

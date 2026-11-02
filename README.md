@@ -25,6 +25,7 @@ stg task "добавить HQ-сканы в трекер"   # request + task + P
 stg task --quick "мелкая правка"          # compact fast-lane spec
 stg plan list
 stg plan show <ID>
+stg plan preflight <ID>                # oracle/corpus проверка до approve
 stg plan render <ID>                    # HTML-артефакт плана
 stg plan approve <ID>                   # human: commit spec в dev + attach
 stg plan auto <ID>                      # policy fast lane, no token

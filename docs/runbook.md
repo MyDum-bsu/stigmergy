@@ -54,6 +54,7 @@ fast_max_dod_chars = 1200
 
 ```bash
 stg task --quick "одна правка в одном файле"
+stg plan preflight <ID>  # oracle/corpus/dod checks before approve
 stg plan auto <ID>       # policy approval without human token
 ```
 

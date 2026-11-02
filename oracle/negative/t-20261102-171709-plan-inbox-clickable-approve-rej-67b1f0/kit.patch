@@ -1,0 +1,21 @@
+diff --git a/conftest.py b/conftest.py
+new file mode 100644
+--- /dev/null
++++ b/conftest.py
+@@ -0,0 +1,16 @@
++"""Negative control kit: a planinbox that trusts every token and allows replay."""
++
++import stigmergy.planinbox as planinbox
++
++
++def _mutant_handle(plan_id, action, *, token, spec_sha, secret, state, apply):
++    apply(action)
++    return 200, action
++
++
++def _mutant_html(*_args, **_kwargs):
++    return ""
++
++
++planinbox.handle_action = _mutant_handle
++planinbox.actions_html = _mutant_html

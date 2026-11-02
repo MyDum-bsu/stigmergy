@@ -6,6 +6,7 @@ changes; the verdict comes from the gate.
 
 from __future__ import annotations
 
+import fcntl
 import time
 import uuid
 from dataclasses import dataclass
@@ -307,6 +308,18 @@ def _gate_events(
         )
 
 
+def _finish_lock(config: Config, task_id: str):
+    path = config.root / ".factory" / "locks" / f"finish-{task_id}.lock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = path.open("a+", encoding="utf-8")
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError as exc:
+        handle.close()
+        raise RuntimeError(f"another finisher is already running for {task_id}") from exc
+    return handle
+
+
 def finish_episode(
     config: Config,
     board: Board,
@@ -317,6 +330,7 @@ def finish_episode(
     auto: bool = False,
     use_sandbox: bool | None = None,
 ) -> EpisodeResult:
+    lock_handle = _finish_lock(config, task_id)
     try:
         result = _finish_episode(
             config,
@@ -328,6 +342,8 @@ def finish_episode(
             use_sandbox=use_sandbox,
         )
     finally:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+        lock_handle.close()
         if not bool(config.runner.get("keep_workspace", True)):
             _close_runner_workspace(config, board, task_id)
     _close_task_tabs(config, task_id)

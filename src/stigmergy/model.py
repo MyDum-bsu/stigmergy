@@ -50,6 +50,7 @@ class Task:
     episode_open: bool = False
     runner_handle: str = ""
     retries: int = 0
+    gate_passed: bool = False
     created_seq: int = 0
     last_seq: int = 0
     sha: str = ""
@@ -153,6 +154,7 @@ class ProjectState:
             task.risk = attrs.get("risk", task.risk)
             task.allowed_paths = list(attrs.get("paths.allowed") or [])
             task.labels = dict(attrs.get("task.labels") or {})
+            task.gate_passed = False
         elif action == "task.approved":
             task.status = QUEUED
             task.spec_sha = attrs.get("spec.sha", task.spec_sha)
@@ -168,6 +170,7 @@ class ProjectState:
             task.status = CLAIMED
             task.episode_open = False
             task.runner_handle = ""
+            task.gate_passed = False
             task.agent = attrs.get("agent.name", task.agent)
             task.lease_until = int(attrs.get("lease.until", task.lease_until))
             task.branch = attrs.get("vcs.branch", task.branch)
@@ -200,11 +203,13 @@ class ProjectState:
             task.evidence = attrs.get("evidence", task.evidence)
         elif action == "gate.passed":
             task.status = GATED
+            task.gate_passed = True
             task.commit = attrs.get("vcs.commit", task.commit)
             task.tree = attrs.get("vcs.tree", task.tree)
             task.evidence = attrs.get("gate.artifact", task.evidence)
         elif action == "gate.failed":
             task.status = QUEUED
+            task.gate_passed = False
             task.retries += 1
             task.evidence = attrs.get("gate.artifact", task.evidence)
         elif action == "control.failed":
@@ -238,7 +243,7 @@ class ProjectState:
         elif action == "task.answered":
             task.answer = attrs.get("answer", task.answer)
             task.answer_by = attrs.get("answered.by", task.answer_by)
-            if task.commit and task.tree:
+            if task.gate_passed and task.commit and task.tree:
                 task.status = INTEGRATED
             elif task.episode_open:
                 task.status = EPISODE

@@ -102,3 +102,25 @@ def test_done_with_commit_requires_gate(repo: Path) -> None:
     board_mod.add_task(board, config, "T1", "", spec_path="specs/T1.md")
     with pytest.raises(BoardError, match="gate.passed"):
         board_mod.done(board, config, "T1", "pi", commit="deadbeef", evidence="trust me")
+
+
+def test_answer_after_failed_gate_is_not_integrated(repo: Path) -> None:
+    board = Board(repo)
+    config = Config.load(repo)
+    board_mod.add_task(board, config, "T1", "", spec_path="specs/T1.md")
+    board.append(
+        "episode.started",
+        {"kind": "agent", "name": "pi"},
+        {"project.name": "fixture", "task.id": "T1", "runner.handle": "t1"},
+    )
+    board.append(
+        "episode.finished",
+        {"kind": "agent", "name": "pi"},
+        {"project.name": "fixture", "task.id": "T1", "vcs.commit": "c", "vcs.tree": "t"},
+    )
+    board.append(
+        "task.answered",
+        {"kind": "human", "name": "human"},
+        {"project.name": "fixture", "task.id": "T1", "answer": "retry", "answered.by": "human"},
+    )
+    assert _state(board).task("T1").status != "integrated"

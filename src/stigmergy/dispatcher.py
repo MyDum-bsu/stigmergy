@@ -294,15 +294,26 @@ def tick(
         if marker:
             if not auto_finish or finishing.get(task.id) == marker:
                 continue
-            finishing[task.id] = marker
+            result = finish_fn(config, task.id)
             actions.append(
                 {
                     "action": "finish",
                     "task": task.id,
                     "detail": f"worker.done seq={marker}",
-                    **finish_fn(config, task.id),
+                    **result,
                 }
             )
+            if result.get("ok"):
+                finishing[task.id] = marker
+            else:
+                finishing.pop(task.id, None)
+                note = notify_lead(
+                    board,
+                    task.id,
+                    f"Finish failed for {task.id}: {result.get('detail', '')}",
+                    hc=hc,
+                )
+                actions.append({"action": "finish_failed", "task": task.id, **note})
             continue
         handle = task.runner_handle
         if not handle or _terminal_alive(handle):

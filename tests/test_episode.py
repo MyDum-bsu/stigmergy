@@ -73,3 +73,22 @@ def test_runner_field_does_not_change_stations(repo: Path) -> None:
 def test_sha_is_content_hash() -> None:
     assert task_sha("T1", "t", [], "true") == task_sha("T1", "t", [], "true")
     assert task_sha("T1", "t", [], "true") != task_sha("T1", "t", [], "false")
+
+
+def test_second_finisher_is_rejected(repo: Path) -> None:
+    import fcntl
+
+    from stigmergy.episode import _finish_lock
+
+    board, config, _branch = _add_and_branch(repo)
+    handle = _finish_lock(config, "T1")
+    try:
+        try:
+            finish_episode(config, board, "T1", "other", noop=True, auto=False, use_sandbox=False)
+        except RuntimeError as exc:
+            assert "another finisher" in str(exc)
+        else:
+            raise AssertionError("expected another finisher to be rejected")
+    finally:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        handle.close()

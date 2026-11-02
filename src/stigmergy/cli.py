@@ -743,6 +743,22 @@ def cmd_worker(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_bootstrap(args: argparse.Namespace) -> int:
+    from stigmergy import bootstrap
+
+    root = find_root(args.board or Path.cwd())
+    data = bootstrap.run(
+        root,
+        name=args.name or "",
+        space=args.space or "",
+        register=not args.no_register,
+        open_lead=not args.no_lead,
+        app=args.app,
+    )
+    _emit(args, data, f"bootstrap {data['project']} space={data['space']} lead={data['lead'].get('terminal', '-')}")
+    return 0
+
+
 def cmd_task(args: argparse.Namespace) -> int:
     _root, config, board = _ctx(args)
     from stigmergy import intake
@@ -1339,6 +1355,14 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("id")
     q.add_argument("--agent", default="pi")
     q.set_defaults(func=cmd_worker)
+
+    p = sub.add_parser("bootstrap", help="initialize project + Lead tab")
+    p.add_argument("--name")
+    p.add_argument("--space")
+    p.add_argument("--app", default="herdr-app")
+    p.add_argument("--no-register", action="store_true")
+    p.add_argument("--no-lead", action="store_true")
+    p.set_defaults(func=cmd_bootstrap)
 
     p = sub.add_parser("task", help="intake: raw idea -> planner")
     p.add_argument("idea", nargs="+")

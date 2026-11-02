@@ -22,6 +22,7 @@ stigmergy разрабатывается через self-host в space `stigmerg
 
 ```bash
 stg task "добавить HQ-сканы в трекер"   # request + task + Plan tab
+stg bootstrap --name myproj              # init + Lead tab (no manual commands)
 stg task --quick "мелкая правка"          # compact fast-lane spec
 stg plan list
 stg plan show <ID>
@@ -89,7 +90,7 @@ installed as user systemd timers on this machine.
 
 Проверено в этом окружении:
 
-- `uv run pytest -q` — 119 passed; `uv run ruff check .` — clean.
+- `uv run pytest -q` — 143 passed; `uv run ruff check .` — clean.
 - T5 end-to-end на клоне `optimization`: `stg run T5-land --runner noop --auto
   --no-sandbox` → `gate.passed`, `control.proven`, `integration.passed`,
   `merge.done`; `dev` fast-forward на `a9f57f6`, `.beads` не в дереве,

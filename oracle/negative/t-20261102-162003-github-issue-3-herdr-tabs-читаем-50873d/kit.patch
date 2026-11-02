@@ -1,7 +1,13 @@
+diff --git a/src/stigmergy/runner/herdr_app.py b/src/stigmergy/runner/herdr_app.py
+index 8c2d64f..2ca178f 100644
 --- a/src/stigmergy/runner/herdr_app.py
 +++ b/src/stigmergy/runner/herdr_app.py
-@@ -100,3 +100,3 @@
+@@ -273,7 +273,7 @@ def tab_label(kind: str, title: str, task_id: str, max_len: int = MAX_TAB_LABEL)
+ 
  def is_protected_tab(name: str) -> bool:
      """Lead and Board tabs outlive every task."""
 -    return name.startswith(PROTECTED_TAB_PREFIXES)
 +    return False
+ 
+ 
+ def tab_marker(name: str) -> str | None:

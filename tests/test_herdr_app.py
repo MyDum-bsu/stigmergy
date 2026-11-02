@@ -116,3 +116,19 @@ def test_project_space_is_created_when_missing(monkeypatch) -> None:
     handle = runner.start("mo-a7j", "prompt", Path("/repo/.factory/worktrees/x"), wait=False)
     assert calls["space.new"] == {"name": "optimization", "folder": "/repo"}
     assert handle.meta["space"] == "sp9"
+
+
+def test_send_paused_accepts_done(monkeypatch) -> None:
+    monkeypatch.setattr(herdr_app, "get", lambda handle: {"status": {"state": "done"}})
+    calls = []
+    monkeypatch.setattr(herdr_app, "hc", lambda *args: (calls.append(args) or (0, "ok")))
+    assert herdr_app.send_paused("t1", "hello") == (True, "ok")
+    assert calls == [("send", "t1", "hello")]
+
+
+def test_send_paused_refuses_working(monkeypatch) -> None:
+    monkeypatch.setattr(herdr_app, "get", lambda handle: {"status": {"state": "working"}})
+    calls = []
+    monkeypatch.setattr(herdr_app, "hc", lambda *args: (calls.append(args) or (0, "ok")))
+    assert herdr_app.send_paused("t1", "hello") == (False, "agent is working")
+    assert calls == []

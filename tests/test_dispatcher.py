@@ -97,3 +97,6 @@ def test_tick_finishes_settled_worker(repo: Path, monkeypatch) -> None:
     )
     assert result["actions"][0]["action"] == "finish"
     assert seen == ["T1"]
+    again = dispatcher.tick(config, board, finish=fake_finish, auto_finish=True, state=result["state"])
+    assert again["actions"] == []
+    assert seen == ["T1"]

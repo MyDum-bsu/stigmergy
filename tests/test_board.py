@@ -71,3 +71,26 @@ def test_next_respects_deps_and_wip(repo: Path) -> None:
     board_mod.done(board, config, "T1", "agent-a", no_commit=True, evidence="ok")
     task2 = board_mod.next_task(board, config, "agent-b")
     assert task2 is not None and task2.id == "T2"
+
+
+def test_lead_answer_keeps_open_episode(repo: Path) -> None:
+    board = Board(repo)
+    config = Config.load(repo)
+    board_mod.add_task(board, config, "T1", "", spec_path="specs/T1.md")
+    board.append(
+        "episode.started",
+        {"kind": "agent", "name": "pi"},
+        {"project.name": "fixture", "task.id": "T1", "runner.handle": "t1"},
+    )
+    board_mod.block(board, config, "T1", "pi", "question")
+    board_mod.answer(board, config, "T1", "lead", "answer")
+    assert _state(board).task("T1").status == "episode"
+
+
+def test_worker_done_is_a_marker(repo: Path) -> None:
+    board = Board(repo)
+    config = Config.load(repo)
+    board_mod.add_task(board, config, "T1", "", spec_path="specs/T1.md")
+    event = board_mod.worker_done(board, config, "T1", "pi")
+    assert event["action"] == "worker.done"
+    assert _state(board).task("T1").status == "queued"

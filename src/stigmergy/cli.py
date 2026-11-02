@@ -488,7 +488,7 @@ def cmd_dispatcher(args: argparse.Namespace) -> int:
 
     if args.watch:
         def show(result: dict) -> None:
-            print(json.dumps(result, ensure_ascii=False))
+            print(json.dumps(result, ensure_ascii=False), flush=True)
 
         dispatcher.watch(
             config,

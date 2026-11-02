@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+
 def _agents() -> Path:
     for parent in Path(__file__).resolve().parents:
         candidate = parent / "AGENTS.md"

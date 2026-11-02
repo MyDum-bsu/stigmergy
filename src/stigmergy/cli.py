@@ -419,6 +419,101 @@ def cmd_merge(args: argparse.Namespace) -> int:
 
 
 # ── dash / status / doctor ─────────────────────────────────────────────────
+def cmd_task(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from stigmergy import intake
+
+    data = intake.create_task(
+        config,
+        board,
+        " ".join(args.idea),
+        title=args.title,
+        priority=args.priority,
+        app=args.app,
+        start_planner=not args.no_planner,
+    )
+    planner = data.get("planner") or {}
+    text = (
+        f"task {data['task']}\n"
+        f"request {data['request']}\n"
+        f"planner {planner.get('terminal') or 'not started'} {planner.get('error') or ''}\n"
+        f"next: stg plan show {data['task']} && stg plan approve {data['task']}"
+    )
+    _emit(args, data, text)
+    return 0
+
+
+def cmd_plan(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from stigmergy import intake
+
+    if args.plan_cmd == "list":
+        rows = intake.plan_list(config, board)
+        lines = []
+        for row in rows:
+            flags = (
+                f"request={int(row['request'])} "
+                f"prd={int(row['prd'])} spec={int(row['spec_file'])}"
+            )
+            lines.append(f"{row['id']}\t{row['status']}\t{flags}\t{row['title']}")
+        _emit(args, rows, "\n".join(lines) or "no plans")
+        return 0
+    if args.plan_cmd == "show":
+        data = intake.plan_show(config, args.id)
+        text = []
+        for key, title in (("request", "REQUEST"), ("prd", "PRD"), ("spec", "SPEC")):
+            text.append(f"===== {title} =====")
+            text.append(data.get(key) or "(empty)")
+        _emit(args, data, "\n".join(text))
+        return 0
+    if args.plan_cmd == "approve":
+        data = intake.approve_plan(config, board, args.id, agent=args.agent)
+        _emit(args, data, f"approved {data['task']} spec={data['spec_sha']}")
+        return 0
+    raise RuntimeError(f"unknown plan command: {args.plan_cmd}")
+
+
+def cmd_dispatcher(args: argparse.Namespace) -> int:
+    _root, config, board = _ctx(args)
+    from stigmergy import dispatcher
+
+    if args.watch:
+        def show(result: dict) -> None:
+            print(json.dumps(result, ensure_ascii=False))
+
+        dispatcher.watch(
+            config,
+            board,
+            app=args.app,
+            interval=args.interval,
+            auto_finish=not args.no_auto_finish,
+            on_tick=show,
+        )
+        return 0
+    result = dispatcher.tick(
+        config,
+        board,
+        app=args.app,
+        auto_finish=not args.no_auto_finish,
+    )
+    _emit(args, result, json.dumps(result, ensure_ascii=False))
+    return 0 if result.get("ok") else 1
+
+
+def cmd_judge(args: argparse.Namespace) -> int:
+    _root, config, _board = _ctx(args)
+    from stigmergy import judge
+
+    if args.judge_cmd == "list":
+        items = judge.decisions(config)
+        lines = [f"{item['id']}\t{item['date']}\t{item['question']}" for item in items]
+        _emit(args, items, "\n".join(lines) or "no decisions")
+        return 0
+    items = judge.search(config, " ".join(args.query), limit=args.limit)
+    _emit(args, items, judge.answer_text(items))
+    return 0
+
+
 def cmd_lead(args: argparse.Namespace) -> int:
     _root, config, board = _ctx(args)
     from stigmergy import lead
@@ -807,6 +902,43 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("--agent", default="stg")
     p.set_defaults(func=cmd_merge)
+
+    p = sub.add_parser("task", help="intake: raw idea -> planner")
+    p.add_argument("idea", nargs="+")
+    p.add_argument("--title")
+    p.add_argument("--priority", type=int, default=2)
+    p.add_argument("--app", default="herdr-app")
+    p.add_argument("--no-planner", action="store_true")
+    p.set_defaults(func=cmd_task)
+
+    p = sub.add_parser("plan", help="planner drafts and approval")
+    pl = p.add_subparsers(dest="plan_cmd", required=True)
+    q = pl.add_parser("list")
+    q.set_defaults(func=cmd_plan)
+    q = pl.add_parser("show")
+    q.add_argument("id")
+    q.set_defaults(func=cmd_plan)
+    q = pl.add_parser("approve")
+    q.add_argument("id")
+    q.add_argument("--agent", default="human")
+    q.set_defaults(func=cmd_plan)
+
+    p = sub.add_parser("dispatcher", help="event-driven factory loop")
+    p.add_argument("--once", action="store_true")
+    p.add_argument("--watch", action="store_true")
+    p.add_argument("--interval", type=int)
+    p.add_argument("--app", default="herdr-app")
+    p.add_argument("--no-auto-finish", action="store_true")
+    p.set_defaults(func=cmd_dispatcher)
+
+    p = sub.add_parser("judge", help="decision base with citations")
+    j = p.add_subparsers(dest="judge_cmd", required=True)
+    q = j.add_parser("list")
+    q.set_defaults(func=cmd_judge)
+    q = j.add_parser("search")
+    q.add_argument("query", nargs="+")
+    q.add_argument("--limit", type=int, default=5)
+    q.set_defaults(func=cmd_judge)
 
     p = sub.add_parser("lead", help="lead architect tab")
     p.add_argument("lead_cmd", nargs="?", choices=["start", "inbox", "answer"], default="start")

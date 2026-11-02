@@ -23,15 +23,21 @@ the shell (stg, hc) and reads.
 Board root: {config.root}
 Project space: {space}
 
-Dispatch a ready task:
-  stg run <ID> --runner herdr-app --detach
-A worker opens as a tab in this space and owns its worktree. Never edit its
-worktree and never run the same task twice.
+Human task intake (the human does not create branches or specs):
+  stg task "<raw idea>"
+That creates the request, the task, and a Plan tab. When the plan is ready:
+  stg plan show <ID>
+  stg plan approve <ID>
+The dispatcher starts approved tasks; a worker opens as a tab in this space
+and owns its worktree. Never edit its worktree and never run the same task twice.
 
 Workers are forbidden to ask the human. When a worker is blocked it writes
 task.blocked and stops. Inspect the lead inbox:
   stg lead inbox
-Answer one blocked worker:
+Before answering, search the decisions with citations:
+  stg judge search "<question>"
+Use only a decision with quote/source/date. If nothing matches, say
+"в базе решений нет" and escalate to the human. Answer one blocked worker:
   stg lead answer <ID> --text "<decision>"
 That records the answer on the board and sends it to the worker terminal.
 

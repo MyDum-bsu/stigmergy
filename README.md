@@ -7,6 +7,8 @@
 
 Пакет `stigmergy`, CLI `stg`, Python 3.12 stdlib, без runtime-зависимостей.
 
+stigmergy разрабатывается через self-host в space `stigmergy`.
+
 ## Документы
 
 - [`docs/spec.md`](docs/spec.md) — спецификация v1: домен, события, станции,

@@ -132,3 +132,23 @@ def test_send_paused_refuses_working(monkeypatch) -> None:
     monkeypatch.setattr(herdr_app, "hc", lambda *args: (calls.append(args) or (0, "ok")))
     assert herdr_app.send_paused("t1", "hello") == (False, "agent is working")
     assert calls == []
+
+
+def test_close_task_tabs(monkeypatch) -> None:
+    monkeypatch.setattr(
+        herdr_app,
+        "spaces",
+        lambda app: [
+            {
+                "tabs": [
+                    {"id": "tb1", "name": "T1 · title"},
+                    {"id": "tb2", "name": "Plan · T1"},
+                    {"id": "tb3", "name": "Board"},
+                ]
+            }
+        ],
+    )
+    calls = []
+    monkeypatch.setattr(herdr_app, "_do", lambda app, command, **kwargs: calls.append((command, kwargs)) or {})
+    assert herdr_app.close_task_tabs("herdr-app", "T1") == ["T1 · title", "Plan · T1"]
+    assert [call[1]["id"] for call in calls] == ["tb1", "tb2"]

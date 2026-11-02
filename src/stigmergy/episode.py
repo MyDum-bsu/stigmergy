@@ -492,6 +492,15 @@ def _finish_episode(
     result.merged = True
     result.detail = f"merged into {config.base}"
     render(board.views_dir, state_of(board, config.name))
+    if str(config.runner.get("kind", "")) == "herdr-app":
+        try:
+            from stigmergy.runner import herdr_app
+
+            herdr_app.close_task_tabs(
+                str(config.runner.get("app", "herdr-app")), task.id
+            )
+        except Exception:
+            pass
     return result
 
 

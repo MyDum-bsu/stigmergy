@@ -213,6 +213,26 @@ def close_space(space_id: str) -> dict:
         return {"ok": False}
 
 
+def close_task_tabs(app: str = DEFAULT_APP, task_id: str = "") -> list[str]:
+    """Close the worker, planner and critic tabs of a finished task."""
+    if not task_id:
+        return []
+    closed: list[str] = []
+    prefixes = (f"{task_id} ·", f"{PREFIX}{task_id}")
+    names = {f"Plan · {task_id}", f"Critic · {task_id}"}
+    for space in spaces(app):
+        for tab in space.get("tabs") or []:
+            name = str(tab.get("name", ""))
+            if not (name in names or any(name.startswith(prefix) for prefix in prefixes)):
+                continue
+            try:
+                _do(app, "tab.close", id=str(tab.get("id", "")), confirmed="true")
+                closed.append(name)
+            except HerdrAppError:
+                continue
+    return closed
+
+
 def cleanup(app: str = DEFAULT_APP, task: str | None = None) -> list[str]:
     closed: list[str] = []
     for space in spaces(app):

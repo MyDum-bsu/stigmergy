@@ -6,7 +6,6 @@ state, and applies a decision at most once.
 """
 
 import pytest
-
 from stigmergy.planinbox import PLAN_ACTIONS, action_token, actions_html, handle_action
 
 SECRET = "oracle-secret"

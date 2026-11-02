@@ -157,8 +157,9 @@ Rules:
   otherwise approval fails before a worker starts.
 - If a decision is genuinely missing, put one short "Open questions" block in
   the PRD and stop. Do not ask through AskUserQuestion.
-- When the drafts are ready, stop. The human runs `stg plan approve {task_id}`
-  unless the spec is a policy-approved fast-lane candidate.
+- When the drafts are ready, stop. Do not run or suggest shell commands to the
+  human: the human never types commands. If the plan is normal/high-risk, say
+  only "план готов, нужно решение" and stop; fast lane waits for policy.
 """
 
 
